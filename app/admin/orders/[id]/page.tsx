@@ -94,7 +94,11 @@ const mockOrderDetail = {
       styleOptions: [
         { name: "Cổ vest 2 khuy", category: "COLLAR", priceAdjustment: 0 },
         { name: "Tay dài", category: "SLEEVE", priceAdjustment: 0 },
-        { name: "Túi trong có nắp", category: "POCKET", priceAdjustment: 50000 },
+        {
+          name: "Túi trong có nắp",
+          category: "POCKET",
+          priceAdjustment: 50000,
+        },
       ],
       totalPrice: 5050000,
     },
@@ -216,7 +220,9 @@ export default function AdminOrderDetailPage() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [searchStaff, setSearchStaff] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState(order.assignedTo?.id || "");
+  const [selectedStaff, setSelectedStaff] = useState(
+    order.assignedTo?.id || ""
+  );
   const [assignmentNote, setAssignmentNote] = useState("");
   const [newStatus, setNewStatus] = useState(currentStatus);
   const [statusNote, setStatusNote] = useState("");
@@ -237,7 +243,9 @@ export default function AdminOrderDetailPage() {
     setAssignmentNote("");
     // Show success notification
     alert(
-      `Đã gán đơn hàng cho ${mockStaffUsers.find((s) => s.id === selectedStaff)?.fullName}`
+      `Đã gán đơn hàng cho ${
+        mockStaffUsers.find((s) => s.id === selectedStaff)?.fullName
+      }`
     );
   };
 
@@ -247,7 +255,11 @@ export default function AdminOrderDetailPage() {
     setIsStatusModalOpen(false);
     setStatusNote("");
     // Send notification email to customer
-    alert(`Đã cập nhật trạng thái đơn hàng thành ${statusConfig[newStatus as keyof typeof statusConfig].label}`);
+    alert(
+      `Đã cập nhật trạng thái đơn hàng thành ${
+        statusConfig[newStatus as keyof typeof statusConfig].label
+      }`
+    );
   };
 
   const handleCancelOrder = () => {
@@ -302,17 +314,12 @@ export default function AdminOrderDetailPage() {
               </div>
               <p className="text-gray-400">
                 Tạo lúc: {new Date(order.createdAt).toLocaleString("vi-VN")} •
-                Cập nhật:{" "}
-                {new Date(order.updatedAt).toLocaleString("vi-VN")}
+                Cập nhật: {new Date(order.updatedAt).toLocaleString("vi-VN")}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrintInvoice}
-              >
+              <Button variant="outline" size="sm" onClick={handlePrintInvoice}>
                 <Printer className="w-4 h-4" />
                 <span>In hóa đơn</span>
               </Button>
@@ -328,7 +335,9 @@ export default function AdminOrderDetailPage() {
                 variant="luxury"
                 size="sm"
                 onClick={() => setIsStatusModalOpen(true)}
-                disabled={currentStatus === "Cancelled" || currentStatus === "Completed"}
+                disabled={
+                  currentStatus === "Cancelled" || currentStatus === "Completed"
+                }
               >
                 <Edit2 className="w-4 h-4" />
                 <span>Cập nhật trạng thái</span>
@@ -401,13 +410,10 @@ export default function AdminOrderDetailPage() {
                           <div>
                             <span className="text-gray-500">Vải:</span>{" "}
                             {product.fabric.name} (+
-                            {product.fabric.priceAdjustment.toLocaleString()}{" "}
-                            ₫)
+                            {product.fabric.priceAdjustment.toLocaleString()} ₫)
                           </div>
                           <div>
-                            <span className="text-gray-500">
-                              Tùy chỉnh:
-                            </span>{" "}
+                            <span className="text-gray-500">Tùy chỉnh:</span>{" "}
                             {product.styleOptions
                               .map((opt) => opt.name)
                               .join(", ")}
@@ -443,14 +449,14 @@ export default function AdminOrderDetailPage() {
                           {key === "chest"
                             ? "Vòng ngực"
                             : key === "waist"
-                              ? "Vòng eo"
-                              : key === "hips"
-                                ? "Vòng mông"
-                                : key === "shoulders"
-                                  ? "Vai"
-                                  : key === "sleeveLength"
-                                    ? "Dài tay"
-                                    : "Dài áo"}
+                            ? "Vòng eo"
+                            : key === "hips"
+                            ? "Vòng mông"
+                            : key === "shoulders"
+                            ? "Vai"
+                            : key === "sleeveLength"
+                            ? "Dài tay"
+                            : "Dài áo"}
                         </div>
                         <div className="text-lg font-medium text-white">
                           {value} cm
@@ -494,9 +500,7 @@ export default function AdminOrderDetailPage() {
                   <div className="pt-2 border-t border-white/10">
                     <span className="text-gray-500">Phương thức:</span>{" "}
                     {order.shippingMethod} •{" "}
-                    <span className="text-gray-500">
-                      Dự kiến giao:
-                    </span>{" "}
+                    <span className="text-gray-500">Dự kiến giao:</span>{" "}
                     {new Date(order.estimatedDelivery).toLocaleDateString(
                       "vi-VN"
                     )}
@@ -603,24 +607,37 @@ export default function AdminOrderDetailPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Phương thức:</span>
                     <span className="text-white font-medium">
-                      {paymentMethodConfig[order.payment.method as keyof typeof paymentMethodConfig].label}
+                      {
+                        paymentMethodConfig[
+                          order.payment
+                            .method as keyof typeof paymentMethodConfig
+                        ].label
+                      }
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Trạng thái:</span>
                     <span
-                      className={`font-medium ${paymentStatusConfig[order.payment.status as keyof typeof paymentStatusConfig].color}`}
+                      className={`font-medium ${
+                        paymentStatusConfig[
+                          order.payment
+                            .status as keyof typeof paymentStatusConfig
+                        ].color
+                      }`}
                     >
-                      {paymentStatusConfig[order.payment.status as keyof typeof paymentStatusConfig].label}
+                      {
+                        paymentStatusConfig[
+                          order.payment
+                            .status as keyof typeof paymentStatusConfig
+                        ].label
+                      }
                     </span>
                   </div>
                   {order.payment.paidAt && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-500">Thanh toán lúc:</span>
                       <span className="text-gray-400">
-                        {new Date(order.payment.paidAt).toLocaleString(
-                          "vi-VN"
-                        )}
+                        {new Date(order.payment.paidAt).toLocaleString("vi-VN")}
                       </span>
                     </div>
                   )}
@@ -975,8 +992,8 @@ export default function AdminOrderDetailPage() {
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
                       <div className="text-sm text-red-300">
-                        Hành động này không thể hoàn tác. Khách hàng sẽ nhận được
-                        thông báo về việc hủy đơn hàng.
+                        Hành động này không thể hoàn tác. Khách hàng sẽ nhận
+                        được thông báo về việc hủy đơn hàng.
                       </div>
                     </div>
                   </div>

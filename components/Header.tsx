@@ -74,6 +74,12 @@ export default function Header() {
 
           {/* Actions */}
           <div className="hidden lg:flex items-center space-x-6">
+            {/* TODO: Show only for ADMIN role */}
+            <Link href="/admin/dashboard">
+              <Button variant="outline" size="sm">
+                Admin
+              </Button>
+            </Link>
             <Link href="/appointments">
               <motion.button
                 whileHover={{ scale: 1.1 }}
