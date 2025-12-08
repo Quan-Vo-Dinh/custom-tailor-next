@@ -143,7 +143,7 @@ export default function AdminAppointmentsPage() {
     "All"
   );
   const [typeFilter, setTypeFilter] = useState<string>("All");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -156,9 +156,7 @@ export default function AdminAppointmentsPage() {
     const matchesStatus =
       statusFilter === "All" ? true : apt.status === statusFilter;
     const matchesType = typeFilter === "All" ? true : apt.type === typeFilter;
-    const matchesDate = selectedDate
-      ? apt.date === selectedDate.toISOString().split("T")[0]
-      : true;
+    const matchesDate = selectedDate ? apt.date === selectedDate : true;
     return matchesSearch && matchesStatus && matchesType && matchesDate;
   });
 

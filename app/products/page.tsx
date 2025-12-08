@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProductCard } from "@/components/ui/ProductCard";
@@ -12,6 +13,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Grid3x3,
+  LayoutGrid,
+  Sparkles,
 } from "lucide-react";
 import { getMockProducts, mockCategories } from "@/lib/mockData";
 
@@ -23,6 +27,7 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [gridCols, setGridCols] = useState<3 | 4>(4);
   const itemsPerPage = 12;
 
   const { products, total, totalPages } = getMockProducts({
@@ -118,24 +123,24 @@ export default function ProductsPage() {
         <button
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
-          className="p-2 rounded-lg border border-gray-200 hover:border-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="p-2 rounded-lg border border-white/20 hover:border-(--color-gold) disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
         {pages.map((page, idx) =>
           page === -1 ? (
-            <span key={`ellipsis-${idx}`} className="px-2">
+            <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
               ...
             </span>
           ) : (
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
-              className={`px-4 py-2 rounded-lg border transition-colors ${
+              className={`px-4 py-2 rounded-lg border transition-colors cursor-pointer ${
                 currentPage === page
-                  ? "bg-yellow-600 text-white border-yellow-600"
-                  : "border-gray-200 hover:border-yellow-600"
+                  ? "bg-(--color-gold) text-charcoal border-(--color-gold)"
+                  : "border-white/20 text-white hover:border-(--color-gold)"
               }`}
             >
               {page}
@@ -146,7 +151,7 @@ export default function ProductsPage() {
         <button
           onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage === totalPages}
-          className="p-2 rounded-lg border border-gray-200 hover:border-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="p-2 rounded-lg border border-white/20 hover:border-(--color-gold) disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -155,115 +160,128 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="min-h-screen pt-32 pb-20">
+    <div className="min-h-screen pt-32 pb-20 relative">
+      {/* Background Effects */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <motion.div
+          className="absolute top-20 -right-40 w-96 h-96 rounded-full bg-(--color-gold)/10 blur-3xl"
+          animate={{
+            x: [0, -50, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+        <motion.div
+          className="absolute bottom-40 -left-40 w-96 h-96 rounded-full bg-(--color-gold)/10 blur-3xl"
+          animate={{
+            x: [0, 50, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      </div>
+
       <div className="container mx-auto px-6 lg:px-12">
-        <AnimatedSection className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-light mb-6">
+        {/* Hero Section */}
+        <AnimatedSection className="text-center mb-16">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-(--color-gold)/10 border border-(--color-gold)/20 mb-6"
+          >
+            <Sparkles className="w-4 h-4 text-(--color-gold)" />
+            <span className="text-sm text-(--color-gold) font-medium">
+              {total} Sản phẩm độc quyền
+            </span>
+          </motion.div>
+
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-light mb-6 leading-tight">
             Bộ Sưu Tập
             <br />
             <span className="text-luxury italic">May Đo Cao Cấp</span>
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto font-light">
+          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto font-light">
             Khám phá những thiết kế độc quyền, được chế tác tỉ mỉ theo số đo của
             bạn
           </p>
         </AnimatedSection>
 
-        <AnimatedSection delay={0.1}>
-          <GlassCard variant="luxury" className="mb-8">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <form onSubmit={handleSearch} className="flex-1 flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Tìm kiếm sản phẩm..."
-                    className="w-full pl-12 pr-4 py-3 bg-gray-800 text-gray-100 placeholder-gray-400 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  Tìm
-                </button>
-              </form>
-
-              <div className="flex gap-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => handleSortChange(e.target.value)}
-                  className="px-4 py-3 bg-gray-800 text-gray-100 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
-                >
-                  <option value="newest">Mới nhất</option>
-                  <option value="price-asc">Giá tăng dần</option>
-                  <option value="price-desc">Giá giảm dần</option>
-                  <option value="name-asc">Tên A-Z</option>
-                  <option value="name-desc">Tên Z-A</option>
-                </select>
-
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-colors ${
-                    showFilters
-                      ? "bg-yellow-600 text-white border-yellow-600"
-                      : "bg-white border-gray-200 hover:border-yellow-600"
-                  }`}
-                >
-                  <SlidersHorizontal className="w-5 h-5" />
-                  Bộ lọc
-                </button>
-              </div>
-            </div>
-
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-200 space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-medium">Danh mục</h3>
+        <div className="grid lg:grid-cols-[280px_1fr] gap-8">
+          {/* Sidebar Filters - Desktop */}
+          <AnimatedSection delay={0.1} className="hidden lg:block">
+            <div className="sticky top-32">
+              <GlassCard className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                    <SlidersHorizontal className="w-5 h-5 text-(--color-gold)" />
+                    Bộ Lọc
+                  </h3>
+                  {(selectedCategory !== "all" ||
+                    priceRange.min > 0 ||
+                    priceRange.max < 50000000) && (
                     <button
                       onClick={resetFilters}
-                      className="text-sm text-gray-600 hover:text-yellow-600 flex items-center gap-1"
+                      className="text-sm text-gray-400 hover:text-(--color-gold) transition-colors cursor-pointer"
                     >
                       <X className="w-4 h-4" />
-                      Xóa bộ lọc
                     </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                  )}
+                </div>
+
+                {/* Categories */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-300 mb-3">
+                    Danh Mục
+                  </h4>
+                  <div className="space-y-2">
                     <button
                       onClick={() => handleCategoryChange("all")}
-                      className={`px-4 py-2 rounded-lg border transition-colors ${
+                      className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
                         selectedCategory === "all"
-                          ? "bg-yellow-600 text-white border-yellow-600"
-                          : "border-gray-200 hover:border-yellow-600"
+                          ? "bg-(--color-gold)/10 text-(--color-gold) border border-(--color-gold)/20"
+                          : "bg-white/5 text-gray-300 hover:bg-white/10"
                       }`}
                     >
-                      Tất cả
+                      <span className="font-medium">Tất cả</span>
+                      <span className="text-sm ml-2 opacity-60">({total})</span>
                     </button>
                     {mockCategories.map((cat) => (
                       <button
                         key={cat.id}
                         onClick={() => handleCategoryChange(cat.name)}
-                        className={`px-4 py-2 rounded-lg border transition-colors ${
+                        className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
                           selectedCategory === cat.name
-                            ? "bg-yellow-600 text-white border-yellow-600"
-                            : "border-gray-200 hover:border-yellow-600"
+                            ? "bg-(--color-gold)/10 text-(--color-gold) border border-(--color-gold)/20"
+                            : "bg-white/5 text-gray-300 hover:bg-white/10"
                         }`}
                       >
-                        {cat.name} ({cat.count})
+                        <span className="font-medium">{cat.name}</span>
+                        <span className="text-sm ml-2 opacity-60">
+                          ({cat.count})
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="font-medium mb-4">Khoảng giá</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <label className="text-sm text-gray-300 mb-1 block">
-                        Từ
+                {/* Price Range */}
+                <div className="pt-6 border-t border-white/10">
+                  <h4 className="text-sm font-medium text-gray-300 mb-3">
+                    Khoảng Giá
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">
+                        Từ (₫)
                       </label>
                       <input
                         type="number"
@@ -274,14 +292,13 @@ export default function ProductsPage() {
                             priceRange.max
                           )
                         }
-                        className="w-full px-4 py-2 bg-gray-800 text-gray-100 placeholder-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
+                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors text-sm"
                         placeholder="0"
                       />
                     </div>
-                    <span className="text-gray-400 mt-6">—</span>
-                    <div className="flex-1">
-                      <label className="text-sm text-gray-300 mb-1 block">
-                        Đến
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">
+                        Đến (₫)
                       </label>
                       <input
                         type="number"
@@ -292,53 +309,232 @@ export default function ProductsPage() {
                             parseInt(e.target.value) || 50000000
                           )
                         }
-                        className="w-full px-4 py-2 bg-gray-800 text-gray-100 placeholder-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600"
-                        placeholder="50000000"
+                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors text-sm"
+                        placeholder="50,000,000"
                       />
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </GlassCard>
-        </AnimatedSection>
+              </GlassCard>
+            </div>
+          </AnimatedSection>
 
-        <div className="mb-6 text-sm text-gray-600">
-          Hiển thị {products.length} trong tổng số {total} sản phẩm
-        </div>
+          {/* Main Content */}
+          <div>
+            {/* Search & Toolbar */}
+            <AnimatedSection delay={0.15}>
+              <GlassCard className="p-4 mb-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Search */}
+                  <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Tìm kiếm sản phẩm..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      />
+                    </div>
+                  </form>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {Array.from({ length: itemsPerPage }).map((_, index) => (
-              <ProductCardSkeleton key={index} />
-            ))}
-          </div>
-        ) : products.length === 0 ? (
-          <EmptyState
-            title="Không tìm thấy sản phẩm"
-            message="Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm"
-            action={{
-              label: "Xóa bộ lọc",
-              onClick: resetFilters,
-            }}
-          />
-        ) : (
-          <>
-            <AnimatedSection delay={0.2}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {products.map((product, index) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    index={index}
-                  />
-                ))}
-              </div>
+                  {/* Sort & View Options */}
+                  <div className="flex gap-2">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => handleSortChange(e.target.value)}
+                      className="px-4 py-2.5 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors cursor-pointer"
+                    >
+                      <option value="newest">Mới nhất</option>
+                      <option value="price-asc">Giá tăng dần</option>
+                      <option value="price-desc">Giá giảm dần</option>
+                      <option value="name-asc">Tên A-Z</option>
+                    </select>
+
+                    {/* Grid Toggle */}
+                    <div className="hidden md:flex items-center gap-1 p-1 bg-white/5 rounded-lg">
+                      <button
+                        onClick={() => setGridCols(4)}
+                        className={`p-2 rounded transition-colors cursor-pointer ${
+                          gridCols === 4
+                            ? "bg-(--color-gold)/20 text-(--color-gold)"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                        title="4 cột"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setGridCols(3)}
+                        className={`p-2 rounded transition-colors cursor-pointer ${
+                          gridCols === 3
+                            ? "bg-(--color-gold)/20 text-(--color-gold)"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                        title="3 cột"
+                      >
+                        <Grid3x3 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Mobile Filter Toggle */}
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors cursor-pointer bg-white/10 border-white/20 hover:border-(--color-gold)"
+                    >
+                      <SlidersHorizontal className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </GlassCard>
             </AnimatedSection>
 
-            {renderPagination()}
-          </>
-        )}
+            {/* Mobile Filters */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="lg:hidden mb-6 overflow-hidden"
+                >
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-white">Bộ Lọc</h3>
+                      <button
+                        onClick={() => setShowFilters(false)}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5 text-gray-400" />
+                      </button>
+                    </div>
+
+                    {/* Mobile Categories */}
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-300 mb-3">
+                        Danh Mục
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => {
+                            handleCategoryChange("all");
+                            setShowFilters(false);
+                          }}
+                          className={`px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                            selectedCategory === "all"
+                              ? "bg-(--color-gold) text-charcoal"
+                              : "bg-white/5 text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          Tất cả
+                        </button>
+                        {mockCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => {
+                              handleCategoryChange(cat.name);
+                              setShowFilters(false);
+                            }}
+                            className={`px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                              selectedCategory === cat.name
+                                ? "bg-(--color-gold) text-charcoal"
+                                : "bg-white/5 text-gray-300 hover:bg-white/10"
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Mobile Price Range */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-300 mb-3">
+                        Khoảng Giá
+                      </h4>
+                      <div className="flex gap-3">
+                        <input
+                          type="number"
+                          value={priceRange.min}
+                          onChange={(e) =>
+                            handlePriceRangeChange(
+                              parseInt(e.target.value) || 0,
+                              priceRange.max
+                            )
+                          }
+                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold)"
+                          placeholder="Từ"
+                        />
+                        <input
+                          type="number"
+                          value={priceRange.max}
+                          onChange={(e) =>
+                            handlePriceRangeChange(
+                              priceRange.min,
+                              parseInt(e.target.value) || 50000000
+                            )
+                          }
+                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold)"
+                          placeholder="Đến"
+                        />
+                      </div>
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Results Count */}
+            <div className="mb-6 text-sm text-gray-400">
+              Hiển thị {products.length} trong tổng số {total} sản phẩm
+              {selectedCategory !== "all" && ` • ${selectedCategory}`}
+            </div>
+
+            {/* Products Grid */}
+            {loading ? (
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 ${
+                  gridCols === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"
+                } gap-6`}
+              >
+                {Array.from({ length: itemsPerPage }).map((_, index) => (
+                  <ProductCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : products.length === 0 ? (
+              <EmptyState
+                title="Không tìm thấy sản phẩm"
+                message="Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm"
+                action={{
+                  label: "Xóa bộ lọc",
+                  onClick: resetFilters,
+                }}
+              />
+            ) : (
+              <>
+                <AnimatedSection delay={0.2}>
+                  <div
+                    className={`grid grid-cols-1 md:grid-cols-2 ${
+                      gridCols === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"
+                    } gap-6`}
+                  >
+                    {products.map((product, index) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                </AnimatedSection>
+
+                {renderPagination()}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
