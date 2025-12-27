@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import {
   Calendar,
   Clock,
@@ -17,60 +19,79 @@ import {
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { getMyAppointments, cancelAppointment } from "@/services/appointments";
+import { AppointmentType, AppointmentStatus, Appointment } from "@/types";
+import { formatAppointmentCode } from "@/lib/utils";
 
-// Mock appointments data
-const mockAppointments = [
+// Mock appointments data (fallback)
+const mockAppointments: Appointment[] = [
   {
     id: "APT-001",
-    date: "2024-03-15",
-    time: "10:00",
-    type: "Đo lường",
-    status: "Confirmed",
-    location: "123 Nguyễn Huệ, Q.1, TP.HCM",
+    customerId: "user-1",
+    customer: {} as any,
+    date: new Date("2024-03-15"),
+    startTime: "10:00",
+    endTime: "11:00",
+    type: AppointmentType.CONSULTATION,
+    status: AppointmentStatus.CONFIRMED,
     notes: "Mang theo các mẫu vest đã chọn",
-    createdAt: "2024-03-01T10:00:00Z",
+    createdAt: new Date("2024-03-01T10:00:00Z"),
+    updatedAt: new Date("2024-03-01T10:00:00Z"),
   },
   {
     id: "APT-002",
-    date: "2024-02-20",
-    time: "14:30",
-    type: "Tư vấn",
-    status: "Completed",
-    location: "123 Nguyễn Huệ, Q.1, TP.HCM",
+    customerId: "user-1",
+    customer: {} as any,
+    date: new Date("2024-02-20"),
+    startTime: "14:30",
+    endTime: "15:30",
+    type: AppointmentType.CONSULTATION,
+    status: AppointmentStatus.COMPLETED,
     notes: "",
-    createdAt: "2024-02-15T09:00:00Z",
+    createdAt: new Date("2024-02-15T09:00:00Z"),
+    updatedAt: new Date("2024-02-15T09:00:00Z"),
   },
   {
     id: "APT-003",
-    date: "2024-02-10",
-    time: "11:00",
-    type: "Thử đồ",
-    status: "Completed",
-    location: "123 Nguyễn Huệ, Q.1, TP.HCM",
+    customerId: "user-1",
+    customer: {} as any,
+    date: new Date("2024-02-10"),
+    startTime: "11:00",
+    endTime: "12:00",
+    type: AppointmentType.FITTING,
+    status: AppointmentStatus.COMPLETED,
     notes: "Thử vest đã hoàn thành",
-    createdAt: "2024-02-05T14:00:00Z",
+    createdAt: new Date("2024-02-05T14:00:00Z"),
+    updatedAt: new Date("2024-02-05T14:00:00Z"),
   },
   {
     id: "APT-004",
-    date: "2024-01-25",
-    time: "15:00",
-    type: "Tư vấn",
-    status: "Cancelled",
-    location: "123 Nguyễn Huệ, Q.1, TP.HCM",
+    customerId: "user-1",
+    customer: {} as any,
+    date: new Date("2024-01-25"),
+    startTime: "15:00",
+    endTime: "16:00",
+    type: AppointmentType.CONSULTATION,
+    status: AppointmentStatus.CANCELLED,
     notes: "",
-    createdAt: "2024-01-20T10:00:00Z",
+    createdAt: new Date("2024-01-20T10:00:00Z"),
+    updatedAt: new Date("2024-01-20T10:00:00Z"),
   },
   {
     id: "APT-005",
-    date: "2024-03-25",
-    time: "09:30",
-    type: "Đo lường",
-    status: "Pending",
-    location: "123 Nguyễn Huệ, Q.1, TP.HCM",
+    customerId: "user-1",
+    customer: {} as any,
+    date: new Date("2024-03-25"),
+    startTime: "09:30",
+    endTime: "10:30",
+    type: AppointmentType.CONSULTATION,
+    status: AppointmentStatus.PENDING,
     notes: "",
-    createdAt: "2024-03-10T11:00:00Z",
+    createdAt: new Date("2024-03-10T11:00:00Z"),
+    updatedAt: new Date("2024-03-10T11:00:00Z"),
   },
-];
+] as Appointment[];
 
 const statusConfig = {
   Pending: {
@@ -86,6 +107,13 @@ const statusConfig = {
     color: "text-blue-400",
     bgColor: "bg-blue-500/10",
     borderColor: "border-blue-500/20",
+  },
+  In_Progress: {
+    label: "Đang diễn ra",
+    icon: Clock4,
+    color: "text-indigo-400",
+    bgColor: "bg-indigo-500/10",
+    borderColor: "border-indigo-500/20",
   },
   Completed: {
     label: "Hoàn thành",
@@ -110,17 +138,58 @@ const statusConfig = {
   },
 };
 
-type AppointmentStatus = keyof typeof statusConfig;
+type LocalAppointmentStatus = keyof typeof statusConfig;
 
 export default function AppointmentsPage() {
-  const [appointments] = useState(mockAppointments);
-  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "All">(
-    "All"
-  );
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<
+    LocalAppointmentStatus | "All"
+  >("All");
 
-  const filteredAppointments = appointments.filter((apt) =>
-    statusFilter === "All" ? true : apt.status === statusFilter
-  );
+  // Load appointments for current user
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        setLoading(true);
+        const data = await getMyAppointments(
+          statusFilter !== "All"
+            ? { status: statusMap[statusFilter] }
+            : undefined
+        );
+        setAppointments(data);
+      } catch (error: any) {
+        console.error("Failed to load appointments:", error);
+        toast.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Không thể tải danh sách lịch hẹn"
+        );
+        // Fallback to mock data so UI vẫn hiển thị
+        setAppointments(mockAppointments);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [statusFilter]);
+
+  // Map between LocalAppointmentStatus and AppointmentStatus enum
+  const statusMap: Record<LocalAppointmentStatus, AppointmentStatus> = {
+    Pending: AppointmentStatus.PENDING,
+    Confirmed: AppointmentStatus.CONFIRMED,
+    In_Progress: AppointmentStatus.IN_PROGRESS,
+    Completed: AppointmentStatus.COMPLETED,
+    Cancelled: AppointmentStatus.CANCELLED,
+    No_Show: AppointmentStatus.NO_SHOW,
+  };
+
+  const filteredAppointments = appointments.filter((apt) => {
+    if (statusFilter === "All") return true;
+    const apiStatus = statusMap[statusFilter];
+    return apt.status === apiStatus;
+  });
 
   const upcomingAppointments = filteredAppointments.filter((apt) => {
     const aptDate = new Date(apt.date);
@@ -128,7 +197,8 @@ export default function AppointmentsPage() {
     today.setHours(0, 0, 0, 0);
     return (
       aptDate >= today &&
-      (apt.status === "Pending" || apt.status === "Confirmed")
+      (apt.status === AppointmentStatus.PENDING ||
+        apt.status === AppointmentStatus.CONFIRMED)
     );
   });
 
@@ -138,28 +208,48 @@ export default function AppointmentsPage() {
     today.setHours(0, 0, 0, 0);
     return (
       aptDate < today ||
-      apt.status === "Completed" ||
-      apt.status === "Cancelled" ||
-      apt.status === "No_Show"
+      apt.status === AppointmentStatus.COMPLETED ||
+      apt.status === AppointmentStatus.CANCELLED ||
+      apt.status === AppointmentStatus.NO_SHOW
     );
   });
 
-  const handleCancelAppointment = (id: string) => {
-    // TODO: Add confirmation dialog
-    // TODO: Integrate with backend
-    console.log("Cancel appointment:", id);
+  const handleCancelAppointment = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn hủy lịch hẹn này?")) {
+      return;
+    }
+
+    try {
+      await cancelAppointment(id);
+      toast.success("Hủy lịch hẹn thành công!");
+      // Reload appointments
+      const data = await getMyAppointments(
+        statusFilter !== "All" ? { status: statusMap[statusFilter] } : undefined
+      );
+      setAppointments(data);
+    } catch (error: any) {
+      toast.error(error.message || "Hủy lịch hẹn thất bại");
+    }
   };
 
-  const canCancel = (appointment: (typeof mockAppointments)[0]) => {
+  const canCancel = (appointment: Appointment) => {
     const aptDate = new Date(appointment.date);
     const today = new Date();
     const hoursDiff = (aptDate.getTime() - today.getTime()) / (1000 * 60 * 60);
     return (
-      (appointment.status === "Pending" ||
-        appointment.status === "Confirmed") &&
+      (appointment.status === AppointmentStatus.PENDING ||
+        appointment.status === AppointmentStatus.CONFIRMED) &&
       hoursDiff > 24
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-32 pb-20 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-32 pb-20">
@@ -196,7 +286,7 @@ export default function AppointmentsPage() {
             >
               Tất cả
             </button>
-            {(Object.keys(statusConfig) as AppointmentStatus[]).map(
+            {(Object.keys(statusConfig) as LocalAppointmentStatus[]).map(
               (status) => {
                 const config = statusConfig[status];
                 return (
@@ -276,7 +366,8 @@ export default function AppointmentsPage() {
                 {statusFilter === "All"
                   ? "Bạn chưa có lịch hẹn nào"
                   : `Không có lịch hẹn với trạng thái "${
-                      statusConfig[statusFilter as AppointmentStatus]?.label
+                      statusConfig[statusFilter as LocalAppointmentStatus]
+                        ?.label
                     }"`}
               </p>
               <Link href="/booking">
@@ -299,12 +390,22 @@ function AppointmentCard({
   canCancel,
   isPast = false,
 }: {
-  appointment: (typeof mockAppointments)[0];
+  appointment: Appointment;
   onCancel: (id: string) => void;
   canCancel: boolean;
   isPast?: boolean;
 }) {
-  const config = statusConfig[appointment.status as AppointmentStatus];
+  // Map AppointmentStatus enum to LocalAppointmentStatus for UI
+  const statusEnumToLocal: Record<AppointmentStatus, LocalAppointmentStatus> = {
+    [AppointmentStatus.PENDING]: "Pending",
+    [AppointmentStatus.CONFIRMED]: "Confirmed",
+    [AppointmentStatus.IN_PROGRESS]: "In_Progress",
+    [AppointmentStatus.COMPLETED]: "Completed",
+    [AppointmentStatus.CANCELLED]: "Cancelled",
+    [AppointmentStatus.NO_SHOW]: "No_Show",
+  };
+  const localStatus = statusEnumToLocal[appointment.status] || "Pending";
+  const config = statusConfig[localStatus] || statusConfig.Pending;
   const StatusIcon = config.icon;
 
   return (
@@ -322,12 +423,20 @@ function AppointmentCard({
           </div>
           <div>
             <h3 className="text-xl font-medium text-white">
-              {appointment.type}
+              {appointment.type === AppointmentType.CONSULTATION
+                ? "Tư vấn"
+                : appointment.type === AppointmentType.FITTING
+                ? "Thử đồ"
+                : appointment.type === AppointmentType.PICKUP
+                ? "Nhận hàng"
+                : appointment.type}
             </h3>
             <p className={`text-sm ${config.color}`}>{config.label}</p>
           </div>
         </div>
-        <span className="text-sm text-gray-500">{appointment.id}</span>
+        <span className="text-sm text-gray-500">
+          Mã: {formatAppointmentCode(appointment.id)}
+        </span>
       </div>
 
       <div className="space-y-3 mb-4">
@@ -344,12 +453,21 @@ function AppointmentCard({
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="text-white">{appointment.time}</span>
+          <span className="text-white">
+            {appointment.startTime} - {appointment.endTime}
+          </span>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="text-white">{appointment.location}</span>
-        </div>
+        {appointment.assignedStaff && (
+          <div className="flex items-center gap-3 text-sm">
+            <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-white">
+              Nhân viên:{" "}
+              {(appointment.assignedStaff as any).fullName ||
+                (appointment.assignedStaff as any).name ||
+                "Chưa gán"}
+            </span>
+          </div>
+        )}
       </div>
 
       {appointment.notes && (

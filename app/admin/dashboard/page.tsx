@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import {
   Package,
   DollarSign,
@@ -15,22 +16,32 @@ import {
   AlertCircle,
   Truck,
   UserCheck,
+  Ruler,
 } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import Link from "next/link";
+import {
+  getDashboardStats,
+  getRecentOrders,
+  getRecentAppointments,
+  getRevenueReport,
+  DashboardStats,
+  RevenueReport,
+} from "@/services/admin";
+import { Order, Appointment, OrderStatus } from "@/types";
 
-// Mock data for dashboard
-const mockStats = {
+// Mock data for dashboard (fallback)
+const mockStats: DashboardStats = {
   totalOrders: 156,
-  monthlyRevenue: 234500000,
   pendingOrders: 12,
-  todayAppointments: 8,
-  newCustomers: 24,
   completedOrders: 98,
-  cancellationRate: 3.2,
-  activeStaff: 6,
+  totalRevenue: 234500000,
+  totalCustomers: 24,
+  totalAppointments: 60,
+  pendingAppointments: 8,
 };
 
 const mockRevenueData = [
@@ -124,21 +135,111 @@ const mockTopProducts = [
 ];
 
 export default function AdminDashboardPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("7days");
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [recentAppointments, setRecentAppointments] = useState<Appointment[]>(
+    []
+  );
+  const [revenueData, setRevenueData] = useState<RevenueReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d" | "90d">(
+    "30d"
+  );
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+
+        // Calculate date range
+        const endDate = new Date();
+        const startDate = new Date();
+        if (selectedPeriod === "7d") {
+          startDate.setDate(endDate.getDate() - 7);
+        } else if (selectedPeriod === "30d") {
+          startDate.setDate(endDate.getDate() - 30);
+        } else {
+          startDate.setDate(endDate.getDate() - 90);
+        }
+
+        const [statsData, ordersData, appointmentsData, revenueDataResult] =
+          await Promise.all([
+            getDashboardStats().catch(() => mockStats),
+            getRecentOrders(10).catch(() => []),
+            getRecentAppointments(10).catch(() => []),
+            getRevenueReport({
+              startDate: startDate.toISOString().split("T")[0],
+              endDate: endDate.toISOString().split("T")[0],
+              groupBy: "day",
+            }).catch(() => null),
+          ]);
+
+        setStats(statsData);
+        setRecentOrders(ordersData);
+        setRecentAppointments(appointmentsData);
+        setRevenueData(revenueDataResult);
+      } catch (error: any) {
+        console.error("Failed to load dashboard data:", error);
+        toast.error("Không thể tải dữ liệu dashboard");
+        // Fallback to mock data
+        setStats(mockStats);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [selectedPeriod]);
 
   // Calculate chart dimensions
-  const maxRevenue = Math.max(...mockRevenueData.map((d) => d.amount));
+  const chartRevenueData =
+    revenueData?.revenueByPeriod ||
+    mockRevenueData.map((d) => ({ date: d.date, revenue: d.amount }));
+  const maxRevenue =
+    chartRevenueData.length > 0
+      ? Math.max(...chartRevenueData.map((d: any) => d.revenue || d.amount))
+      : 10000000;
   const chartHeight = 200;
   const chartWidth = 600;
 
-  // Calculate total for pie chart
-  const totalOrders = mockOrdersByStatus.reduce(
-    (sum, item) => sum + item.count,
-    0
+  // Calculate orders by status from recent orders
+  const ordersByStatus = recentOrders.reduce((acc, order) => {
+    const status = order.status;
+    if (!acc[status]) {
+      acc[status] = 0;
+    }
+    acc[status]++;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const ordersByStatusArray = Object.entries(ordersByStatus).map(
+    ([status, count]) => ({
+      status,
+      count,
+      color:
+        status === OrderStatus.PENDING
+          ? "#FBBF24"
+          : status === OrderStatus.CONFIRMED
+          ? "#60A5FA"
+          : status === OrderStatus.IN_PRODUCTION
+          ? "#A78BFA"
+          : status === OrderStatus.SHIPPING
+          ? "#34D399"
+          : status === OrderStatus.COMPLETED
+          ? "#10B981"
+          : "#EF4444",
+    })
   );
 
+  // Calculate total for pie chart
+  const totalOrders =
+    ordersByStatusArray.reduce((sum, item) => sum + item.count, 0) ||
+    mockOrdersByStatus.reduce((sum, item) => sum + item.count, 0);
+
   // Calculate pie chart segments
-  const pieSegments = mockOrdersByStatus.reduce<
+  const pieSegments = (
+    totalOrders > 0 ? ordersByStatusArray : mockOrdersByStatus
+  ).reduce<
     Array<
       (typeof mockOrdersByStatus)[0] & {
         percentage: number;
@@ -159,6 +260,26 @@ export default function AdminDashboardPage() {
     return acc;
   }, []);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-32 pb-20 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen pt-32 pb-20 flex items-center justify-center">
+        <GlassCard className="p-12 text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-light mb-4 text-white">Lỗi</h2>
+          <p className="text-gray-400">Không thể tải dữ liệu dashboard</p>
+        </GlassCard>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-32 pb-20">
       <div className="container mx-auto px-6 lg:px-12">
@@ -175,9 +296,9 @@ export default function AdminDashboardPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedPeriod("7days")}
+                onClick={() => setSelectedPeriod("7d")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  selectedPeriod === "7days"
+                  selectedPeriod === "7d"
                     ? "bg-(--color-gold) text-charcoal"
                     : "bg-white/5 text-gray-400 hover:bg-white/10"
                 }`}
@@ -185,9 +306,9 @@ export default function AdminDashboardPage() {
                 7 ngày
               </button>
               <button
-                onClick={() => setSelectedPeriod("30days")}
+                onClick={() => setSelectedPeriod("30d")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  selectedPeriod === "30days"
+                  selectedPeriod === "30d"
                     ? "bg-(--color-gold) text-charcoal"
                     : "bg-white/5 text-gray-400 hover:bg-white/10"
                 }`}
@@ -195,9 +316,9 @@ export default function AdminDashboardPage() {
                 30 ngày
               </button>
               <button
-                onClick={() => setSelectedPeriod("90days")}
+                onClick={() => setSelectedPeriod("90d")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  selectedPeriod === "90days"
+                  selectedPeriod === "90d"
                     ? "bg-(--color-gold) text-charcoal"
                     : "bg-white/5 text-gray-400 hover:bg-white/10"
                 }`}
@@ -223,7 +344,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="text-sm text-gray-400 mb-1">Tổng đơn hàng</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.totalOrders}
+                {stats.totalOrders}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -239,9 +360,9 @@ export default function AdminDashboardPage() {
                   +8%
                 </div>
               </div>
-              <div className="text-sm text-gray-400 mb-1">Doanh thu tháng</div>
+              <div className="text-sm text-gray-400 mb-1">Doanh thu tổng</div>
               <div className="text-2xl font-medium text-white">
-                {(mockStats.monthlyRevenue / 1000000).toFixed(1)}M
+                {(stats.totalRevenue / 1000000).toFixed(1)}M
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -260,7 +381,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="text-sm text-gray-400 mb-1">Chờ xử lý</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.pendingOrders}
+                {stats.pendingOrders}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -277,9 +398,11 @@ export default function AdminDashboardPage() {
                   </div>
                 </Link>
               </div>
-              <div className="text-sm text-gray-400 mb-1">Lịch hẹn hôm nay</div>
+              <div className="text-sm text-gray-400 mb-1">
+                Lịch hẹn chờ xử lý
+              </div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.todayAppointments}
+                {stats.pendingAppointments}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -295,9 +418,9 @@ export default function AdminDashboardPage() {
                   +18%
                 </div>
               </div>
-              <div className="text-sm text-gray-400 mb-1">Khách hàng mới</div>
+              <div className="text-sm text-gray-400 mb-1">Tổng khách hàng</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.newCustomers}
+                {stats.totalCustomers}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -312,7 +435,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="text-sm text-gray-400 mb-1">Hoàn thành</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.completedOrders}
+                {stats.completedOrders}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -325,9 +448,9 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="text-xs text-gray-400">Cần giảm</div>
               </div>
-              <div className="text-sm text-gray-400 mb-1">Tỷ lệ hủy</div>
+              <div className="text-sm text-gray-400 mb-1">Tổng lịch hẹn</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.cancellationRate}%
+                {stats.totalAppointments}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -344,9 +467,9 @@ export default function AdminDashboardPage() {
                   </div>
                 </Link>
               </div>
-              <div className="text-sm text-gray-400 mb-1">Nhân viên</div>
+              <div className="text-sm text-gray-400 mb-1">Tổng khách hàng</div>
               <div className="text-3xl font-medium text-white">
-                {mockStats.activeStaff}
+                {stats.totalCustomers}
               </div>
             </GlassCard>
           </AnimatedSection>
@@ -633,7 +756,7 @@ export default function AdminDashboardPage() {
             <h3 className="text-xl font-medium text-white mb-4">
               Hành động nhanh
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <Link href="/admin/orders?status=Pending">
                 <Button variant="outline" className="w-full justify-start">
                   <Clock className="w-5 h-5" />
@@ -644,6 +767,12 @@ export default function AdminDashboardPage() {
                 <Button variant="outline" className="w-full justify-start">
                   <Calendar className="w-5 h-5" />
                   <span>Lịch hẹn hôm nay</span>
+                </Button>
+              </Link>
+              <Link href="/admin/measurements">
+                <Button variant="outline" className="w-full justify-start">
+                  <Ruler className="w-5 h-5" />
+                  <span>Quản lý số đo</span>
                 </Button>
               </Link>
               <Link href="/admin/products">

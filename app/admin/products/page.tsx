@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
@@ -20,107 +20,99 @@ import {
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getCategories,
+} from "@/services/products";
+import { Product, ProductCategory } from "@/types";
+import toast from "react-hot-toast";
+import Link from "next/link";
 
-// Mock data
-const mockProducts = [
-  {
-    id: "1",
-    name: "Vest Truyền Thống",
-    category: "Vest",
-    basePrice: 3500000,
-    description: "Vest may đo cao cấp theo phong cách truyền thống",
-    image: "/images/products/vest-1.jpg",
-    stock: "In Stock",
-    fabricOptions: 5,
-    styleOptions: 8,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Sơ Mi Cao Cấp",
-    category: "Sơ Mi",
-    basePrice: 1500000,
-    description: "Sơ mi may đo với chất liệu cao cấp",
-    image: "/images/products/shirt-1.jpg",
-    stock: "In Stock",
-    fabricOptions: 4,
-    styleOptions: 6,
-    createdAt: "2024-01-20",
-  },
-  {
-    id: "3",
-    name: "Vest Hiện Đại",
-    category: "Vest",
-    basePrice: 4200000,
-    description: "Vest phong cách hiện đại, trẻ trung",
-    image: "/images/products/vest-2.jpg",
-    stock: "In Stock",
-    fabricOptions: 6,
-    styleOptions: 10,
-    createdAt: "2024-02-01",
-  },
-  {
-    id: "4",
-    name: "Áo Dài Truyền Thống",
-    category: "Áo Dài",
-    basePrice: 5500000,
-    description: "Áo dài may đo theo truyền thống Việt Nam",
-    image: "/images/products/aodai-1.jpg",
-    stock: "In Stock",
-    fabricOptions: 7,
-    styleOptions: 5,
-    createdAt: "2024-02-10",
-  },
-];
-
-const categories = ["Vest", "Sơ Mi", "Áo Dài", "Quần", "Phụ Kiện"];
-
-type Product = (typeof mockProducts)[0];
+const categoryLabels: Record<ProductCategory, string> = {
+  SUIT: "Vest",
+  SHIRT: "Sơ Mi",
+  DRESS: "Áo Dài",
+  COAT: "Áo Khoác",
+  PANTS: "Quần",
+  VEST: "Áo Vest",
+};
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("All");
+  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | "All">("All");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 8;
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
+    category: "" as ProductCategory | "",
     basePrice: "",
     description: "",
-    image: "",
-    fabricOptions: "",
-    styleOptions: "",
+    imageUrl: "",
+    isActive: true,
   });
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "All" ? true : product.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getProducts({
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchQuery || undefined,
+          category: categoryFilter !== "All" ? categoryFilter : undefined,
+        });
+        setProducts(response.data || []);
+        setTotalPages(response.meta?.totalPages || 1);
+        setTotalItems(response.meta?.total || 0);
+      } catch (err: any) {
+        setError(err.message || "Không thể tải danh sách sản phẩm");
+        console.error("Error fetching products:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const paginatedProducts = filteredProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+    fetchProducts();
+  }, [currentPage, searchQuery, categoryFilter]);
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats.map((c) => c.value));
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const handleAdd = () => {
     setEditingProduct(null);
     setFormData({
       name: "",
-      category: "",
+      category: "" as ProductCategory | "",
       basePrice: "",
       description: "",
-      image: "",
-      fabricOptions: "",
-      styleOptions: "",
+      imageUrl: "",
+      isActive: true,
     });
     setIsFormOpen(true);
   };
@@ -131,61 +123,79 @@ export default function AdminProductsPage() {
       name: product.name,
       category: product.category,
       basePrice: product.basePrice.toString(),
-      description: product.description,
-      image: product.image,
-      fabricOptions: product.fabricOptions.toString(),
-      styleOptions: product.styleOptions.toString(),
+      description: product.description || "",
+      imageUrl: product.images?.[0] || "",
+      isActive: true,
     });
     setIsFormOpen(true);
   };
 
-  const handleSave = () => {
-    // TODO: Integrate with backend
+  const handleSave = async () => {
+    try {
     if (editingProduct) {
-      setProducts(
-        products.map((p) =>
-          p.id === editingProduct.id
-            ? {
-                ...p,
+        await updateProduct(editingProduct.id, {
                 name: formData.name,
-                category: formData.category,
+          description: formData.description,
                 basePrice: Number(formData.basePrice),
-                description: formData.description,
-                fabricOptions: Number(formData.fabricOptions),
-                styleOptions: Number(formData.styleOptions),
-              }
-            : p
-        )
-      );
+          category: formData.category || undefined,
+          imageUrl: formData.imageUrl || undefined,
+          isActive: formData.isActive,
+        });
+        toast.success("Đã cập nhật sản phẩm");
     } else {
-      const newProduct: Product = {
-        id: Date.now().toString(),
+        await createProduct({
         name: formData.name,
-        category: formData.category,
+          description: formData.description,
         basePrice: Number(formData.basePrice),
-        description: formData.description,
-        image: formData.image || "/images/products/default.jpg",
-        stock: "In Stock",
-        fabricOptions: Number(formData.fabricOptions),
-        styleOptions: Number(formData.styleOptions),
-        createdAt: new Date().toISOString(),
-      };
-      setProducts([newProduct, ...products]);
+          category: formData.category || undefined,
+          imageUrl: formData.imageUrl || undefined,
+          isActive: formData.isActive,
+        });
+        toast.success("Đã thêm sản phẩm mới");
     }
     setIsFormOpen(false);
+      // Refresh products
+      const response = await getProducts({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
+        category: categoryFilter !== "All" ? categoryFilter : undefined,
+      });
+      setProducts(response.data || []);
+      setTotalPages(response.meta?.totalPages || 1);
+      setTotalItems(response.meta?.total || 0);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể lưu sản phẩm");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    // TODO: Add confirmation dialog
-    // TODO: Integrate with backend
-    setProducts(products.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
+      return;
+    }
+    try {
+      await deleteProduct(id);
+      toast.success("Đã xóa sản phẩm");
+      // Refresh products
+      const response = await getProducts({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
+        category: categoryFilter !== "All" ? categoryFilter : undefined,
+      });
+      setProducts(response.data || []);
+      setTotalPages(response.meta?.totalPages || 1);
+      setTotalItems(response.meta?.total || 0);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể xóa sản phẩm");
+    }
   };
 
   const stats = {
-    total: products.length,
-    vest: products.filter((p) => p.category === "Vest").length,
-    shirt: products.filter((p) => p.category === "Sơ Mi").length,
-    aodai: products.filter((p) => p.category === "Áo Dài").length,
+    total: totalItems,
+    vest: products.filter((p) => p.category === ProductCategory.VEST || p.category === ProductCategory.SUIT).length,
+    shirt: products.filter((p) => p.category === ProductCategory.SHIRT).length,
+    aodai: products.filter((p) => p.category === ProductCategory.DRESS).length,
   };
 
   return (
@@ -222,7 +232,7 @@ export default function AdminProductsPage() {
           <AnimatedSection delay={0.15}>
             <GlassCard className="p-6">
               <div className="text-sm text-gray-400 mb-1">Vest</div>
-              <div className="text-3xl font-medium text-(--color-gold)">
+              <div className="text-3xl font-medium text-[var(--color-gold)]">
                 {stats.vest}
               </div>
             </GlassCard>
@@ -257,7 +267,7 @@ export default function AdminProductsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm sản phẩm theo tên hoặc mô tả..."
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                 />
               </div>
 
@@ -268,7 +278,7 @@ export default function AdminProductsPage() {
                   onClick={() => setCategoryFilter("All")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     categoryFilter === "All"
-                      ? "bg-(--color-gold) text-charcoal"
+                      ? "bg-[var(--color-gold)] text-charcoal"
                       : "bg-white/5 text-gray-400 hover:bg-white/10"
                   }`}
                 >
@@ -280,11 +290,11 @@ export default function AdminProductsPage() {
                     onClick={() => setCategoryFilter(category)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       categoryFilter === category
-                        ? "bg-(--color-gold) text-charcoal"
+                        ? "bg-[var(--color-gold)] text-charcoal"
                         : "bg-white/5 text-gray-400 hover:bg-white/10"
                     }`}
                   >
-                    {category}
+                    {categoryLabels[category] || category}
                   </button>
                 ))}
               </div>
@@ -292,22 +302,40 @@ export default function AdminProductsPage() {
           </GlassCard>
         </AnimatedSection>
 
+        {/* Loading State */}
+        {loading && (
+          <AnimatedSection delay={0.35}>
+            <div className="flex justify-center py-20">
+              <LoadingSpinner />
+            </div>
+          </AnimatedSection>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <AnimatedSection delay={0.35}>
+            <ErrorMessage message={error} />
+          </AnimatedSection>
+        )}
+
         {/* Products Grid */}
+        {!loading && !error && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {paginatedProducts.map((product, index) => (
+            {products.map((product, index) => (
             <AnimatedSection key={product.id} delay={0.05 * index}>
-              <GlassCard className="overflow-hidden hover:border-(--color-gold)/50 transition-colors group">
+                <GlassCard className="overflow-hidden hover:border-[var(--color-gold)]/50 transition-colors group">
                 <div className="relative h-48 bg-white/5">
                   <Image
-                    src={product.image}
+                      src={product.images?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect fill='%23f3f4f6' width='800' height='600'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EProduct%3C/text%3E%3C/svg%3E"}
                     alt={product.name}
                     fill
                     className="object-cover"
+                      unoptimized
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button
                       onClick={() => handleEdit(product)}
-                      className="p-2 bg-(--color-gold)/90 hover:bg-(--color-gold) rounded-lg transition-colors cursor-pointer"
+                        className="p-2 bg-[var(--color-gold)]/90 hover:bg-[var(--color-gold)] rounded-lg transition-colors cursor-pointer"
                       title="Chỉnh sửa"
                     >
                       <Edit2 className="w-5 h-5 text-charcoal" />
@@ -319,38 +347,40 @@ export default function AdminProductsPage() {
                     >
                       <Trash2 className="w-5 h-5 text-white" />
                     </button>
+                      <Link href={`/products/${product.id}`}>
                     <button
                       className="p-2 bg-blue-500/90 hover:bg-blue-500 rounded-lg transition-colors cursor-pointer"
                       title="Xem chi tiết"
                     >
                       <Eye className="w-5 h-5 text-white" />
                     </button>
+                      </Link>
                   </div>
                 </div>
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs px-2 py-1 rounded bg-(--color-gold)/10 text-(--color-gold) border border-(--color-gold)/20">
-                      {product.category}
+                      <span className="text-xs px-2 py-1 rounded bg-[var(--color-gold)]/10 text-[var(--color-gold)] border border-[var(--color-gold)]/20">
+                        {categoryLabels[product.category] || product.category}
                     </span>
-                    <span className="text-xs text-green-400">
-                      {product.stock}
+                      <span className={`text-xs ${product.featured ? "text-green-400" : "text-gray-400"}`}>
+                        {product.featured ? "Nổi bật" : "Bình thường"}
                     </span>
                   </div>
                   <h3 className="text-lg font-medium text-white mb-2">
                     {product.name}
                   </h3>
                   <p className="text-sm text-gray-400 mb-3 line-clamp-2">
-                    {product.description}
+                      {product.description || "Không có mô tả"}
                   </p>
                   <div className="flex items-center justify-between text-sm mb-3">
                     <span className="text-gray-400">
-                      {product.fabricOptions} vải
+                        {product.availableFabrics?.length || 0} vải
                     </span>
                     <span className="text-gray-400">
-                      {product.styleOptions} kiểu
+                        {product.availableStyles?.length || 0} kiểu
                     </span>
                   </div>
-                  <div className="text-xl font-medium text-(--color-gold)">
+                    <div className="text-xl font-medium text-[var(--color-gold)]">
                     {product.basePrice.toLocaleString()} đ
                   </div>
                 </div>
@@ -358,9 +388,10 @@ export default function AdminProductsPage() {
             </AnimatedSection>
           ))}
         </div>
+        )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {!loading && !error && totalPages > 1 && (
           <AnimatedSection delay={0.4}>
             <div className="flex items-center justify-center gap-2">
               <button
@@ -377,7 +408,7 @@ export default function AdminProductsPage() {
                     onClick={() => setCurrentPage(page)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                       currentPage === page
-                        ? "bg-(--color-gold) text-charcoal"
+                        ? "bg-[var(--color-gold)] text-charcoal"
                         : "bg-white/5 text-gray-400 hover:bg-white/10"
                     }`}
                   >
@@ -399,11 +430,11 @@ export default function AdminProductsPage() {
         )}
 
         {/* Empty State */}
-        {filteredProducts.length === 0 && (
+        {!loading && !error && products.length === 0 && (
           <AnimatedSection delay={0.5}>
             <div className="text-center py-20">
-              <div className="w-20 h-20 bg-(--color-gold)/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="w-10 h-10 text-(--color-gold)" />
+              <div className="w-20 h-20 bg-[var(--color-gold)]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Package className="w-10 h-10 text-[var(--color-gold)]" />
               </div>
               <h3 className="text-2xl font-light text-white mb-2">
                 Không tìm thấy sản phẩm
@@ -464,7 +495,7 @@ export default function AdminProductsPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       placeholder="Vest Truyền Thống"
                     />
                   </div>
@@ -477,14 +508,14 @@ export default function AdminProductsPage() {
                     <select
                       value={formData.category}
                       onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
+                        setFormData({ ...formData, category: e.target.value as ProductCategory })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                     >
                       <option value="">Chọn danh mục</option>
                       {categories.map((cat) => (
                         <option key={cat} value={cat}>
-                          {cat}
+                          {categoryLabels[cat] || cat}
                         </option>
                       ))}
                     </select>
@@ -501,47 +532,9 @@ export default function AdminProductsPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, basePrice: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       placeholder="3500000"
                     />
-                  </div>
-
-                  {/* Options */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Số lượng vải
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.fabricOptions}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            fabricOptions: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
-                        placeholder="5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Số lượng kiểu dáng
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.styleOptions}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            styleOptions: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
-                        placeholder="8"
-                      />
-                    </div>
                   </div>
 
                   {/* Description */}
@@ -558,25 +551,45 @@ export default function AdminProductsPage() {
                         })
                       }
                       rows={4}
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors resize-none"
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors resize-none"
                       placeholder="Mô tả chi tiết về sản phẩm..."
                     />
                   </div>
 
-                  {/* Image Upload */}
+                  {/* Image URL */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Hình ảnh sản phẩm
+                      URL hình ảnh sản phẩm
                     </label>
-                    <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-(--color-gold)/50 transition-colors cursor-pointer">
-                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">
-                        Click để tải ảnh lên hoặc kéo thả vào đây
-                      </p>
+                    <input
+                      type="url"
+                      value={formData.imageUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, imageUrl: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
+                      placeholder="https://example.com/image.jpg"
+                    />
                       <p className="text-xs text-gray-500 mt-1">
-                        PNG, JPG, WEBP (Max 5MB)
+                      Nhập URL hình ảnh hoặc để trống
                       </p>
                     </div>
+
+                  {/* Active Status */}
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isActive}
+                        onChange={(e) =>
+                          setFormData({ ...formData, isActive: e.target.checked })
+                        }
+                        className="w-4 h-4 rounded border-white/20 bg-white/10 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-gray-300">
+                        Sản phẩm đang hoạt động
+                      </span>
+                    </label>
                   </div>
 
                   {/* Actions */}

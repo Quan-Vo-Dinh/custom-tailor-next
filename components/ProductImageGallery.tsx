@@ -8,21 +8,59 @@ import { ChevronLeft, ChevronRight, ZoomIn } from "lucide-react";
 interface ProductImageGalleryProps {
   images: string[];
   productName: string;
+  /** The main displayed image (e.g., current mockup based on style selection) */
+  mainImage?: string;
+  /** Fixed thumbnail images for the grid (e.g., 4 fabric mockups) */
+  thumbnailImages?: string[];
+  /** Callback when a thumbnail is clicked */
+  onThumbnailClick?: (index: number) => void;
 }
+
+// Placeholder image as data URI
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect fill='%23f3f4f6' width='800' height='600'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EImage%3C/text%3E%3C/svg%3E";
 
 export const ProductImageGallery = ({
   images,
   productName,
+  mainImage,
+  thumbnailImages,
+  onThumbnailClick,
 }: ProductImageGalleryProps) => {
+  // Use thumbnailImages if provided, otherwise fallback to images
+  const displayThumbnails =
+    thumbnailImages && thumbnailImages.length > 0 ? thumbnailImages : images;
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
 
+  // Determine the current main image to display
+  // If mainImage prop is provided, use it; otherwise use selected from thumbnails
+  const currentMainImage =
+    mainImage || displayThumbnails[selectedImage] || images[0];
+
   const nextImage = () => {
-    setSelectedImage((prev) => (prev + 1) % images.length);
+    const newIndex = (selectedImage + 1) % displayThumbnails.length;
+    setSelectedImage(newIndex);
+    if (onThumbnailClick) {
+      onThumbnailClick(newIndex);
+    }
   };
 
   const prevImage = () => {
-    setSelectedImage((prev) => (prev - 1 + images.length) % images.length);
+    const newIndex =
+      (selectedImage - 1 + displayThumbnails.length) % displayThumbnails.length;
+    setSelectedImage(newIndex);
+    if (onThumbnailClick) {
+      onThumbnailClick(newIndex);
+    }
+  };
+
+  const handleThumbnailClick = (index: number) => {
+    setSelectedImage(index);
+    if (onThumbnailClick) {
+      onThumbnailClick(index);
+    }
   };
 
   return (
@@ -30,11 +68,12 @@ export const ProductImageGallery = ({
       {/* Main Image */}
       <div className="relative aspect-3/4 glass-luxury rounded-xl overflow-hidden group">
         <Image
-          src={images[selectedImage]}
+          src={currentMainImage || PLACEHOLDER_IMAGE}
           alt={`${productName} - Image ${selectedImage + 1}`}
           fill
           className="object-cover"
           priority
+          unoptimized
         />
 
         {/* Zoom Button */}
@@ -46,7 +85,7 @@ export const ProductImageGallery = ({
         </button>
 
         {/* Navigation Arrows */}
-        {images.length > 1 && (
+        {displayThumbnails.length > 1 && (
           <>
             <button
               onClick={prevImage}
@@ -65,16 +104,16 @@ export const ProductImageGallery = ({
 
         {/* Image Counter */}
         <div className="absolute bottom-4 right-4 px-4 py-2 glass-luxury text-sm rounded-full font-light">
-          {selectedImage + 1} / {images.length}
+          {selectedImage + 1} / {displayThumbnails.length}
         </div>
       </div>
 
       {/* Thumbnails */}
       <div className="grid grid-cols-4 gap-3">
-        {images.map((image, index) => (
+        {displayThumbnails.map((image, index) => (
           <button
             key={index}
-            onClick={() => setSelectedImage(index)}
+            onClick={() => handleThumbnailClick(index)}
             className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all duration-300 ${
               selectedImage === index
                 ? "border-gold ring-2 ring-gold/30 scale-105"
@@ -82,10 +121,11 @@ export const ProductImageGallery = ({
             }`}
           >
             <Image
-              src={image}
+              src={image || PLACEHOLDER_IMAGE}
               alt={`${productName} thumbnail ${index + 1}`}
               fill
               className="object-cover"
+              unoptimized
             />
           </button>
         ))}
@@ -108,11 +148,12 @@ export const ProductImageGallery = ({
               className="relative max-w-6xl max-h-full"
             >
               <Image
-                src={images[selectedImage]}
+                src={images[selectedImage] || PLACEHOLDER_IMAGE}
                 alt={`${productName} zoomed`}
                 width={1200}
                 height={1600}
                 className="object-contain max-h-[90vh]"
+                unoptimized
               />
             </motion.div>
           </motion.div>

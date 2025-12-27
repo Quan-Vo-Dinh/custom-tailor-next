@@ -11,18 +11,29 @@ interface TimeSlotPickerProps {
   date: string;
   selectedSlot: TimeSlot | null;
   onSelect: (slot: TimeSlot) => void;
+  availableSlots?: TimeSlot[];
+  loading?: boolean;
 }
 
 export const TimeSlotPicker = ({
   date,
   selectedSlot,
   onSelect,
+  availableSlots: propsAvailableSlots,
+  loading: propsLoading,
 }: TimeSlotPickerProps) => {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // If availableSlots are provided from props, use them
+    if (propsAvailableSlots && propsAvailableSlots.length > 0) {
+      setSlots(propsAvailableSlots);
+      return;
+    }
+
+    // Otherwise, fallback to mock data
     const fetchSlots = async () => {
       if (!date) return;
 
@@ -45,7 +56,9 @@ export const TimeSlotPicker = ({
     };
 
     fetchSlots();
-  }, [date]);
+  }, [date, propsAvailableSlots]);
+
+  const isLoading = propsLoading !== undefined ? propsLoading : loading;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -57,7 +70,7 @@ export const TimeSlotPicker = ({
     });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <GlassCard variant="luxury" className="p-12">
         <LoadingSpinner text="Đang tải khung giờ..." />

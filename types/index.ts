@@ -1,8 +1,8 @@
 // User Types
 export enum UserRole {
-  CUSTOMER = 'CUSTOMER',
-  ADMIN = 'ADMIN',
-  STAFF = 'STAFF',
+  CUSTOMER = "CUSTOMER",
+  ADMIN = "ADMIN",
+  STAFF = "STAFF",
 }
 
 export interface User {
@@ -18,12 +18,12 @@ export interface User {
 
 // Product Types
 export enum ProductCategory {
-  SUIT = 'SUIT',
-  SHIRT = 'SHIRT',
-  DRESS = 'DRESS',
-  COAT = 'COAT',
-  PANTS = 'PANTS',
-  VEST = 'VEST',
+  SUIT = "SUIT",
+  SHIRT = "SHIRT",
+  DRESS = "DRESS",
+  COAT = "COAT",
+  PANTS = "PANTS",
+  VEST = "VEST",
 }
 
 export interface Fabric {
@@ -34,6 +34,10 @@ export interface Fabric {
   price: number;
   image: string;
   stock: number;
+  // API fields (mapping)
+  imageUrl?: string;
+  priceAdjustment?: string | number;
+  description?: string;
 }
 
 export interface Style {
@@ -42,6 +46,10 @@ export interface Style {
   category: string;
   description: string;
   priceModifier: number;
+  // API fields (mapping)
+  type?: string;
+  imageUrl?: string;
+  priceAdjustment?: string | number;
 }
 
 export interface Product {
@@ -64,6 +72,7 @@ export interface Measurement {
   id: string;
   userId: string;
   name: string;
+  details?: Record<string, any>;
   chest?: number;
   waist?: number;
   hips?: number;
@@ -77,28 +86,40 @@ export interface Measurement {
   updatedAt: Date;
 }
 
+// Address Types
+export interface Address {
+  id: string;
+  userId: string;
+  street: string;
+  city: string;
+  country: string;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Order Types
 export enum OrderStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  IN_PRODUCTION = 'IN_PRODUCTION',
-  READY_FOR_PICKUP = 'READY_FOR_PICKUP',
-  SHIPPING = 'SHIPPING',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  IN_PRODUCTION = "IN_PRODUCTION",
+  READY_FOR_PICKUP = "READY_FOR_PICKUP",
+  SHIPPING = "SHIPPING",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum PaymentMethod {
-  COD = 'COD',
-  STRIPE = 'STRIPE',
-  SEPAY = 'SEPAY',
+  COD = "COD",
+  STRIPE = "STRIPE",
+  SEPAY = "SEPAY",
 }
 
 export enum PaymentStatus {
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  FAILED = 'FAILED',
-  REFUNDED = 'REFUNDED',
+  PENDING = "PENDING",
+  PAID = "PAID",
+  FAILED = "FAILED",
+  REFUNDED = "REFUNDED",
 }
 
 export interface OrderItem {
@@ -130,6 +151,7 @@ export interface Order {
   notes?: string;
   assignedStaffId?: string;
   assignedStaff?: User;
+  estimatedDelivery?: Date;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
@@ -137,17 +159,18 @@ export interface Order {
 
 // Appointment Types
 export enum AppointmentStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-  NO_SHOW = 'NO_SHOW',
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+  NO_SHOW = "NO_SHOW",
 }
 
 export enum AppointmentType {
-  CONSULTATION = 'CONSULTATION',
-  FITTING = 'FITTING',
-  PICKUP = 'PICKUP',
+  CONSULTATION = "CONSULTATION",
+  FITTING = "FITTING",
+  PICKUP = "PICKUP",
 }
 
 export interface Appointment {

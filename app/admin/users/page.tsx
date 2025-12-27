@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -24,82 +24,16 @@ import {
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
-
-// Mock data
-const mockUsers = [
-  {
-    id: "1",
-    fullName: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    phone: "0901234567",
-    role: "CUSTOMER",
-    status: "Active",
-    ordersCount: 5,
-    appointmentsCount: 3,
-    createdAt: "2024-01-15T10:30:00Z",
-    lastLogin: "2024-03-10T14:20:00Z",
-  },
-  {
-    id: "2",
-    fullName: "Trần Thị B",
-    email: "tranthib@example.com",
-    phone: "0912345678",
-    role: "CUSTOMER",
-    status: "Active",
-    ordersCount: 8,
-    appointmentsCount: 5,
-    createdAt: "2024-01-20T09:00:00Z",
-    lastLogin: "2024-03-11T10:15:00Z",
-  },
-  {
-    id: "3",
-    fullName: "Lê Văn C",
-    email: "levanc@example.com",
-    phone: "0923456789",
-    role: "STAFF",
-    status: "Active",
-    ordersCount: 0,
-    appointmentsCount: 25,
-    createdAt: "2024-02-01T11:00:00Z",
-    lastLogin: "2024-03-12T09:30:00Z",
-  },
-  {
-    id: "4",
-    fullName: "Phạm Thị D",
-    email: "phamthid@example.com",
-    phone: "0934567890",
-    role: "ADMIN",
-    status: "Active",
-    ordersCount: 0,
-    appointmentsCount: 0,
-    createdAt: "2024-01-10T08:00:00Z",
-    lastLogin: "2024-03-12T08:00:00Z",
-  },
-  {
-    id: "5",
-    fullName: "Hoàng Văn E",
-    email: "hoangvane@example.com",
-    phone: "0945678901",
-    role: "CUSTOMER",
-    status: "Inactive",
-    ordersCount: 2,
-    appointmentsCount: 1,
-    createdAt: "2024-02-05T15:30:00Z",
-    lastLogin: "2024-02-20T16:00:00Z",
-  },
-  {
-    id: "6",
-    fullName: "Võ Thị F",
-    email: "vothif@example.com",
-    phone: "0956789012",
-    role: "CUSTOMER",
-    status: "Active",
-    ordersCount: 12,
-    appointmentsCount: 8,
-    createdAt: "2024-01-25T12:00:00Z",
-    lastLogin: "2024-03-11T18:45:00Z",
-  },
-];
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  getAllUsers,
+  updateUser,
+  deleteUser,
+  type UpdateUserDto,
+} from "@/services/users";
+import { User as UserType, UserRole } from "@/types";
+import toast from "react-hot-toast";
 
 const roleConfig = {
   CUSTOMER: {
@@ -116,71 +50,59 @@ const roleConfig = {
   },
   ADMIN: {
     label: "Quản trị",
-    color: "text-(--color-gold)",
-    bgColor: "bg-(--color-gold)/10",
-    borderColor: "border-(--color-gold)/20",
+    color: "text-[var(--color-gold)]",
+    bgColor: "bg-[var(--color-gold)]/10",
+    borderColor: "border-[var(--color-gold)]/20",
   },
 };
 
-const statusConfig = {
-  Active: {
-    label: "Hoạt động",
-    color: "text-green-400",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/20",
-  },
-  Inactive: {
-    label: "Không hoạt động",
-    color: "text-gray-400",
-    bgColor: "bg-gray-500/10",
-    borderColor: "border-gray-500/20",
-  },
-  Suspended: {
-    label: "Tạm khóa",
-    color: "text-red-400",
-    bgColor: "bg-red-500/10",
-    borderColor: "border-red-500/20",
-  },
-};
-
-type Role = keyof typeof roleConfig;
-type Status = keyof typeof statusConfig;
-type User = (typeof mockUsers)[0];
+type Role = "CUSTOMER" | "STAFF" | "ADMIN";
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "All">("All");
-  const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
 
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
-    role: "",
-    status: "",
+    role: "" as Role | "",
   });
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.phone.includes(searchQuery);
-    const matchesRole = roleFilter === "All" ? true : user.role === roleFilter;
-    const matchesStatus =
-      statusFilter === "All" ? true : user.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getAllUsers({
+          page: currentPage,
+          limit: itemsPerPage,
+          role: roleFilter !== "All" ? roleFilter : undefined,
+          search: searchQuery || undefined,
+        });
+        setUsers(response.users || []);
+        setTotalPages(response.pagination?.totalPages || 1);
+        setTotalItems(response.pagination?.totalItems || 0);
+      } catch (err: any) {
+        setError(err.message || "Không thể tải danh sách người dùng");
+        console.error("Error fetching users:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+    fetchUsers();
+  }, [currentPage, searchQuery, roleFilter]);
 
   const handleAdd = () => {
     setEditingUser(null);
@@ -188,78 +110,80 @@ export default function AdminUsersPage() {
       fullName: "",
       email: "",
       phone: "",
-      role: "",
-      status: "Active",
+      role: "" as Role | "",
     });
     setIsFormOpen(true);
   };
 
-  const handleEdit = (user: User) => {
+  const handleEdit = (user: UserType) => {
     setEditingUser(user);
     setFormData({
-      fullName: user.fullName,
+      fullName: user.name || "",
       email: user.email,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
+      phone: user.phone || "",
+      role: user.role as Role,
     });
     setIsFormOpen(true);
   };
 
-  const handleSave = () => {
-    // TODO: Integrate with backend
+  const handleSave = async () => {
+    try {
     if (editingUser) {
-      setUsers(
-        users.map((u) =>
-          u.id === editingUser.id
-            ? {
-                ...u,
-                fullName: formData.fullName,
-                email: formData.email,
-                phone: formData.phone,
-                role: formData.role as Role,
-                status: formData.status as Status,
-              }
-            : u
-        )
-      );
+        const updateData: UpdateUserDto = {
+          fullName: formData.fullName || undefined,
+          phoneNumber: formData.phone || undefined,
+          role: formData.role || undefined,
+        };
+        await updateUser(editingUser.id, updateData);
+        toast.success("Đã cập nhật người dùng");
     } else {
-      const newUser: User = {
-        id: Date.now().toString(),
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role as Role,
-        status: formData.status as Status,
-        ordersCount: 0,
-        appointmentsCount: 0,
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-      };
-      setUsers([newUser, ...users]);
+        toast.error("Chức năng tạo người dùng mới chưa được hỗ trợ");
+        return;
     }
     setIsFormOpen(false);
+      // Refresh users
+      const response = await getAllUsers({
+        page: currentPage,
+        limit: itemsPerPage,
+        role: roleFilter !== "All" ? roleFilter : undefined,
+        search: searchQuery || undefined,
+      });
+      setUsers(response.users || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+      setTotalItems(response.pagination?.totalItems || 0);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể lưu người dùng");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    // TODO: Add confirmation dialog
-    // TODO: Integrate with backend
-    setUsers(users.filter((u) => u.id !== id));
-  };
-
-  const handleStatusToggle = (userId: string, currentStatus: Status) => {
-    const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
-    setUsers(
-      users.map((u) => (u.id === userId ? { ...u, status: newStatus } : u))
-    );
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) {
+      return;
+    }
+    try {
+      await deleteUser(id);
+      toast.success("Đã xóa người dùng");
+      // Refresh users
+      const response = await getAllUsers({
+        page: currentPage,
+        limit: itemsPerPage,
+        role: roleFilter !== "All" ? roleFilter : undefined,
+        search: searchQuery || undefined,
+      });
+      setUsers(response.users || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+      setTotalItems(response.pagination?.totalItems || 0);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể xóa người dùng");
+    }
   };
 
   const stats = {
-    total: users.length,
-    customers: users.filter((u) => u.role === "CUSTOMER").length,
-    staff: users.filter((u) => u.role === "STAFF").length,
-    admins: users.filter((u) => u.role === "ADMIN").length,
-    active: users.filter((u) => u.status === "Active").length,
+    total: totalItems,
+    customers: users.filter((u) => u.role === UserRole.CUSTOMER).length,
+    staff: users.filter((u) => u.role === UserRole.STAFF).length,
+    admins: users.filter((u) => u.role === UserRole.ADMIN).length,
+    active: users.length, // API không có status field
   };
 
   return (
@@ -312,7 +236,7 @@ export default function AdminUsersPage() {
           <AnimatedSection delay={0.25}>
             <GlassCard className="p-6">
               <div className="text-sm text-gray-400 mb-1">Quản trị</div>
-              <div className="text-3xl font-medium text-(--color-gold)">
+              <div className="text-3xl font-medium text-[var(--color-gold)]">
                 {stats.admins}
               </div>
             </GlassCard>
@@ -339,7 +263,7 @@ export default function AdminUsersPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm theo tên, email, số điện thoại..."
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                 />
               </div>
 
@@ -353,7 +277,7 @@ export default function AdminUsersPage() {
                     onClick={() => setRoleFilter("All")}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       roleFilter === "All"
-                        ? "bg-(--color-gold) text-charcoal"
+                        ? "bg-[var(--color-gold)] text-charcoal"
                         : "bg-white/5 text-gray-400 hover:bg-white/10"
                     }`}
                   >
@@ -374,39 +298,29 @@ export default function AdminUsersPage() {
                   ))}
                 </div>
 
-                {/* Status Filter */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-gray-400">Trạng thái:</span>
-                  <button
-                    onClick={() => setStatusFilter("All")}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      statusFilter === "All"
-                        ? "bg-(--color-gold) text-charcoal"
-                        : "bg-white/5 text-gray-400 hover:bg-white/10"
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                  {(Object.keys(statusConfig) as Status[]).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => setStatusFilter(status)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        statusFilter === status
-                          ? `${statusConfig[status].bgColor} ${statusConfig[status].color} border ${statusConfig[status].borderColor}`
-                          : "bg-white/5 text-gray-400 hover:bg-white/10"
-                      }`}
-                    >
-                      {statusConfig[status].label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </GlassCard>
         </AnimatedSection>
 
+        {/* Loading State */}
+        {loading && (
+          <AnimatedSection delay={0.4}>
+            <div className="flex justify-center py-20">
+              <LoadingSpinner />
+            </div>
+          </AnimatedSection>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <AnimatedSection delay={0.4}>
+            <ErrorMessage message={error} />
+          </AnimatedSection>
+        )}
+
         {/* Users Table */}
+        {!loading && !error && (
         <AnimatedSection delay={0.4}>
           <GlassCard className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -423,12 +337,6 @@ export default function AdminUsersPage() {
                       Vai trò
                     </th>
                     <th className="text-left p-4 text-sm font-medium text-gray-300">
-                      Trạng thái
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-gray-300">
-                      Hoạt động
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-gray-300">
                       Ngày tham gia
                     </th>
                     <th className="text-right p-4 text-sm font-medium text-gray-300">
@@ -437,9 +345,8 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedUsers.map((user, index) => {
+                    {users.map((user, index) => {
                     const role = roleConfig[user.role as Role];
-                    const status = statusConfig[user.status as Status];
                     return (
                       <motion.tr
                         key={user.id}
@@ -450,17 +357,17 @@ export default function AdminUsersPage() {
                       >
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-(--color-gold)/10 flex items-center justify-center">
-                              <span className="text-(--color-gold) font-medium">
-                                {user.fullName.charAt(0)}
+                              <div className="w-10 h-10 rounded-full bg-[var(--color-gold)]/10 flex items-center justify-center">
+                                <span className="text-[var(--color-gold)] font-medium">
+                                  {(user.name || user.email).charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div>
                               <div className="text-white font-medium">
-                                {user.fullName}
+                                  {user.name || user.email}
                               </div>
                               <div className="text-sm text-gray-400">
-                                ID: {user.id}
+                                  ID: {user.id.substring(0, 8)}...
                               </div>
                             </div>
                           </div>
@@ -471,10 +378,12 @@ export default function AdminUsersPage() {
                               <Mail className="w-4 h-4 text-gray-400" />
                               {user.email}
                             </div>
+                              {user.phone && (
                             <div className="flex items-center gap-2 text-gray-300">
                               <Phone className="w-4 h-4 text-gray-400" />
                               {user.phone}
                             </div>
+                              )}
                           </div>
                         </td>
                         <td className="p-4">
@@ -486,41 +395,10 @@ export default function AdminUsersPage() {
                           </span>
                         </td>
                         <td className="p-4">
-                          <button
-                            onClick={() =>
-                              handleStatusToggle(user.id, user.status as Status)
-                            }
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${status.bgColor} ${status.color} border ${status.borderColor} hover:opacity-80 transition-opacity cursor-pointer`}
-                          >
-                            {user.status === "Active" ? (
-                              <CheckCircle className="w-4 h-4" />
-                            ) : (
-                              <XCircle className="w-4 h-4" />
-                            )}
-                            {status.label}
-                          </button>
-                        </td>
-                        <td className="p-4">
-                          <div className="text-sm space-y-1">
-                            <div className="text-white">
-                              {user.ordersCount} đơn hàng
-                            </div>
-                            <div className="text-gray-400">
-                              {user.appointmentsCount} lịch hẹn
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
                           <div className="text-sm text-gray-300">
-                            <div className="flex items-center gap-1.5 mb-1">
+                              <div className="flex items-center gap-1.5">
                               <Calendar className="w-4 h-4 text-gray-400" />
                               {new Date(user.createdAt).toLocaleDateString(
-                                "vi-VN"
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Đăng nhập:{" "}
-                              {new Date(user.lastLogin).toLocaleDateString(
                                 "vi-VN"
                               )}
                             </div>
@@ -530,10 +408,10 @@ export default function AdminUsersPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleEdit(user)}
-                              className="p-2 hover:bg-(--color-gold)/10 rounded-lg transition-colors cursor-pointer"
+                                className="p-2 hover:bg-[var(--color-gold)]/10 rounded-lg transition-colors cursor-pointer"
                               title="Chỉnh sửa"
                             >
-                              <Edit2 className="w-4 h-4 text-(--color-gold)" />
+                                <Edit2 className="w-4 h-4 text-[var(--color-gold)]" />
                             </button>
                             <button
                               onClick={() => handleDelete(user.id)}
@@ -541,12 +419,6 @@ export default function AdminUsersPage() {
                               title="Xóa"
                             >
                               <Trash2 className="w-4 h-4 text-red-400" />
-                            </button>
-                            <button
-                              className="p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                              title="Thêm"
-                            >
-                              <MoreVertical className="w-4 h-4 text-gray-400" />
                             </button>
                           </div>
                         </td>
@@ -562,8 +434,8 @@ export default function AdminUsersPage() {
               <div className="p-4 border-t border-white/10 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
                   Hiển thị {(currentPage - 1) * itemsPerPage + 1} -{" "}
-                  {Math.min(currentPage * itemsPerPage, filteredUsers.length)}{" "}
-                  trong tổng số {filteredUsers.length} người dùng
+                    {Math.min(currentPage * itemsPerPage, totalItems)}{" "}
+                    trong tổng số {totalItems} người dùng
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -580,7 +452,7 @@ export default function AdminUsersPage() {
                         onClick={() => setCurrentPage(page)}
                         className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                           currentPage === page
-                            ? "bg-(--color-gold) text-charcoal"
+                              ? "bg-[var(--color-gold)] text-charcoal"
                             : "bg-white/5 text-gray-400 hover:bg-white/10"
                         }`}
                       >
@@ -602,13 +474,14 @@ export default function AdminUsersPage() {
             )}
           </GlassCard>
         </AnimatedSection>
+        )}
 
         {/* Empty State */}
-        {filteredUsers.length === 0 && (
+        {!loading && !error && users.length === 0 && (
           <AnimatedSection delay={0.5}>
             <div className="text-center py-20">
-              <div className="w-20 h-20 bg-(--color-gold)/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-10 h-10 text-(--color-gold)" />
+              <div className="w-20 h-20 bg-[var(--color-gold)]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="w-10 h-10 text-[var(--color-gold)]" />
               </div>
               <h3 className="text-2xl font-light text-white mb-2">
                 Không tìm thấy người dùng
@@ -665,7 +538,7 @@ export default function AdminUsersPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, fullName: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       placeholder="Nguyễn Văn A"
                     />
                   </div>
@@ -681,7 +554,8 @@ export default function AdminUsersPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      disabled={!!editingUser}
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors disabled:opacity-50"
                       placeholder="email@example.com"
                     />
                   </div>
@@ -689,7 +563,7 @@ export default function AdminUsersPage() {
                   {/* Phone */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Số điện thoại <span className="text-red-500">*</span>
+                      Số điện thoại
                     </label>
                     <input
                       type="tel"
@@ -697,13 +571,12 @@ export default function AdminUsersPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, phone: e.target.value })
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       placeholder="0901234567"
                     />
                   </div>
 
-                  {/* Role & Status */}
-                  <div className="grid md:grid-cols-2 gap-4">
+                  {/* Role */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Vai trò <span className="text-red-500">*</span>
@@ -711,9 +584,9 @@ export default function AdminUsersPage() {
                       <select
                         value={formData.role}
                         onChange={(e) =>
-                          setFormData({ ...formData, role: e.target.value })
+                        setFormData({ ...formData, role: e.target.value as Role })
                         }
-                        className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       >
                         <option value="">Chọn vai trò</option>
                         {(Object.keys(roleConfig) as Role[]).map((role) => (
@@ -722,27 +595,6 @@ export default function AdminUsersPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Trạng thái <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData({ ...formData, status: e.target.value })
-                        }
-                        className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
-                      >
-                        {(Object.keys(statusConfig) as Status[]).map(
-                          (status) => (
-                            <option key={status} value={status}>
-                              {statusConfig[status].label}
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
                   </div>
 
                   {/* Actions */}
@@ -754,8 +606,8 @@ export default function AdminUsersPage() {
                       disabled={
                         !formData.fullName ||
                         !formData.email ||
-                        !formData.phone ||
-                        !formData.role
+                        !formData.role ||
+                        !editingUser
                       }
                     >
                       <Save className="w-5 h-5" />

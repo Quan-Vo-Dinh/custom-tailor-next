@@ -1,26 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, isAuthenticated, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
+  // Redirect if already authenticated (only after loading is complete)
+  useEffect(() => {
+    // Wait for auth to finish loading before redirecting
+    if (!loading && isAuthenticated) {
+      const redirect = searchParams.get("redirect") || "/";
+      // Use replace instead of push to avoid adding to history
+      router.replace(redirect);
+    }
+  }, [isAuthenticated, loading, router, searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setIsLoading(true);
-    // TODO: Integrate with backend API
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    
+    try {
+      await login(formData.email, formData.password);
+      // Wait a bit for AuthContext to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Redirect to home or previous page
+      const redirect = searchParams.get("redirect") || "/";
+      router.replace(redirect);
+    } catch (err: any) {
+      setError(err.message || "Đăng nhập thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -126,6 +154,13 @@ export default function LoginPage() {
                 </span>
               </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+                {error}
+              </div>
+            )}
 
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -246,5 +281,19 @@ export default function LoginPage() {
         </AnimatedSection>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-gray-300">Đang tải...</div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

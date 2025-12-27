@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Mail, ArrowRight, ArrowLeft, CheckCircle } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { Button } from "@/components/ui/Button";
+import { forgotPassword } from "@/services/auth";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -28,10 +29,14 @@ export default function ForgotPasswordPage() {
     }
 
     setIsLoading(true);
-    // TODO: Integrate with backend API
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      await forgotPassword({ email });
+      setIsSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Gửi email thất bại. Vui lòng thử lại.");
+    } finally {
     setIsLoading(false);
-    setIsSuccess(true);
+    }
   };
 
   if (isSuccess) {

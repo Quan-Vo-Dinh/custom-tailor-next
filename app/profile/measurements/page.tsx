@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 import {
   Ruler,
   Plus,
@@ -16,67 +17,22 @@ import {
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
-
-// Mock measurements data
-type MeasurementData = {
-  id: string;
-  name: string;
-  chest: number;
-  waist: number;
-  hips?: number;
-  shoulders: number;
-  sleeveLength?: number;
-  inseam?: number;
-  neck?: number;
-  notes: string;
-  createdAt: string;
-};
-
-const mockMeasurements: MeasurementData[] = [
-  {
-    id: "1",
-    name: "Số đo Vest",
-    chest: 96,
-    waist: 82,
-    hips: 98,
-    shoulders: 44,
-    sleeveLength: 62,
-    inseam: 78,
-    neck: 38,
-    notes: "Số đo chuẩn cho vest công sở",
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Số đo Sơ mi",
-    chest: 94,
-    waist: 80,
-    shoulders: 43,
-    sleeveLength: 61,
-    neck: 38,
-    notes: "",
-    createdAt: "2024-02-01",
-  },
-];
-
-type Measurement = {
-  id?: string;
-  name: string;
-  chest: number | string;
-  waist: number | string;
-  hips?: number | string;
-  shoulders: number | string;
-  sleeveLength?: number | string;
-  inseam?: number | string;
-  neck?: number | string;
-  notes?: string;
-};
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import {
+  getMeasurements,
+  createMeasurement,
+  updateMeasurement,
+  deleteMeasurement,
+} from "@/services/users";
+import type { Measurement } from "@/types";
 
 export default function MeasurementsPage() {
-  const [measurements, setMeasurements] = useState(mockMeasurements);
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Measurement>({
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
     name: "",
     chest: "",
     waist: "",
@@ -87,6 +43,24 @@ export default function MeasurementsPage() {
     neck: "",
     notes: "",
   });
+
+  useEffect(() => {
+    const loadMeasurements = async () => {
+      try {
+        setLoading(true);
+        const data = await getMeasurements();
+        setMeasurements(data);
+      } catch (error: any) {
+        console.error("Failed to load measurements:", error);
+        toast.error("Không thể tải danh sách số đo");
+        setMeasurements([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMeasurements();
+  }, []);
 
   const handleAdd = () => {
     setIsAdding(true);
@@ -104,72 +78,79 @@ export default function MeasurementsPage() {
     });
   };
 
-  const handleEdit = (measurement: (typeof mockMeasurements)[0]) => {
+  const handleEdit = (measurement: Measurement) => {
     setIsAdding(false);
-    setEditingId(measurement.id);
+    setEditingId(measurement.id || "");
     setFormData({
       name: measurement.name,
-      chest: measurement.chest,
-      waist: measurement.waist,
-      hips: measurement.hips,
-      shoulders: measurement.shoulders,
-      sleeveLength: measurement.sleeveLength,
-      inseam: measurement.inseam,
-      neck: measurement.neck,
+      chest: measurement.chest?.toString() || "",
+      waist: measurement.waist?.toString() || "",
+      hips: measurement.hips?.toString() || "",
+      shoulders: measurement.shoulders?.toString() || "",
+      sleeveLength: measurement.sleeveLength?.toString() || "",
+      inseam: measurement.inseam?.toString() || "",
+      neck: measurement.neck?.toString() || "",
       notes: measurement.notes || "",
     });
   };
 
-  const handleSave = () => {
-    // TODO: Integrate with backend
-    if (isAdding) {
-      const timestamp = new Date().toISOString();
-      const randomId = `temp-${timestamp}`;
-      const newMeasurement: MeasurementData = {
-        id: randomId,
-        name: formData.name,
+  const handleSave = async () => {
+    if (!formData.name.trim() || !formData.chest || !formData.waist || !formData.shoulders) {
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const details: Record<string, any> = {
         chest: Number(formData.chest),
         waist: Number(formData.waist),
-        hips: formData.hips ? Number(formData.hips) : undefined,
         shoulders: Number(formData.shoulders),
-        sleeveLength: formData.sleeveLength
-          ? Number(formData.sleeveLength)
-          : undefined,
-        inseam: formData.inseam ? Number(formData.inseam) : undefined,
-        neck: formData.neck ? Number(formData.neck) : undefined,
-        notes: formData.notes || "",
-        createdAt: timestamp,
       };
+      
+      if (formData.hips) details.hips = Number(formData.hips);
+      if (formData.sleeveLength) details.sleeveLength = Number(formData.sleeveLength);
+      if (formData.inseam) details.inseam = Number(formData.inseam);
+      if (formData.neck) details.neck = Number(formData.neck);
+      if (formData.notes) details.notes = formData.notes;
+
+      if (isAdding) {
+        const newMeasurement = await createMeasurement({
+          name: formData.name,
+          details,
+        });
       setMeasurements([...measurements, newMeasurement]);
+        toast.success("Thêm số đo thành công!");
     } else if (editingId) {
+        const updatedMeasurement = await updateMeasurement(editingId, {
+          name: formData.name,
+          details,
+        });
       setMeasurements(
-        measurements.map((m) =>
-          m.id === editingId
-            ? {
-                ...m,
-                name: formData.name,
-                chest: Number(formData.chest),
-                waist: Number(formData.waist),
-                hips: formData.hips ? Number(formData.hips) : undefined,
-                shoulders: Number(formData.shoulders),
-                sleeveLength: formData.sleeveLength
-                  ? Number(formData.sleeveLength)
-                  : undefined,
-                inseam: formData.inseam ? Number(formData.inseam) : undefined,
-                neck: formData.neck ? Number(formData.neck) : undefined,
-                notes: formData.notes || "",
-              }
-            : m
-        )
-      );
+          measurements.map((m) => (m.id === editingId ? updatedMeasurement : m))
+        );
+        toast.success("Cập nhật số đo thành công!");
     }
     handleCancel();
+    } catch (error: any) {
+      toast.error(error.message || "Thao tác thất bại");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    // TODO: Add confirmation dialog
-    // TODO: Integrate with backend
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa số đo này?")) {
+      return;
+    }
+
+    try {
+      await deleteMeasurement(id);
     setMeasurements(measurements.filter((m) => m.id !== id));
+      toast.success("Xóa số đo thành công!");
+    } catch (error: any) {
+      toast.error(error.message || "Xóa số đo thất bại");
+    }
   };
 
   const handleCancel = () => {
@@ -197,6 +178,14 @@ export default function MeasurementsPage() {
     { key: "inseam", label: "Dài quần (cm)", required: false },
     { key: "neck", label: "Vòng cổ (cm)", required: false },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-32 pb-20 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-32 pb-20">
@@ -276,7 +265,7 @@ export default function MeasurementsPage() {
                           <input
                             type="number"
                             value={
-                              formData[field.key as keyof Measurement] || ""
+                              formData[field.key as keyof typeof formData] || ""
                             }
                             onChange={(e) =>
                               setFormData({
@@ -324,14 +313,24 @@ export default function MeasurementsPage() {
                         onClick={handleSave}
                         className="flex-1"
                         disabled={
+                          submitting ||
                           !formData.name ||
                           !formData.chest ||
                           !formData.waist ||
                           !formData.shoulders
                         }
                       >
+                        {submitting ? (
+                          <>
+                            <LoadingSpinner />
+                            <span>Đang lưu...</span>
+                          </>
+                        ) : (
+                          <>
                         <Save className="w-5 h-5" />
                         <span>{isAdding ? "Thêm số đo" : "Lưu thay đổi"}</span>
+                          </>
+                        )}
                       </Button>
                       <Button
                         type="button"

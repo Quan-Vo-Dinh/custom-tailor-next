@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Style } from "@/types";
@@ -16,13 +17,39 @@ export const StyleSelector = ({
   selectedStyleIds,
   onToggle,
 }: StyleSelectorProps) => {
+  // Get style category - support both `category` and `type` fields
+  const getStyleCategory = (style: Style): string => {
+    return style.type || style.category || "Khác";
+  };
+
+  // Get style price - support both `priceModifier` and `priceAdjustment` fields
+  const getStylePrice = (style: Style): number => {
+    if (style.priceAdjustment !== undefined) {
+      return typeof style.priceAdjustment === "string"
+        ? parseFloat(style.priceAdjustment)
+        : style.priceAdjustment;
+    }
+    return style.priceModifier || 0;
+  };
+
+  // Get style image
+  const getStyleImage = (style: Style): string | null => {
+    if (!style.imageUrl) return null;
+    return decodeURIComponent(style.imageUrl);
+  };
+
+  // Group styles by category (using type field from API)
+  const groupedStyles = styles.reduce((acc, style) => {
+    const category = getStyleCategory(style);
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(style);
+    return acc;
+  }, {} as Record<string, Style[]>);
+
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
-    Object.keys(
-      styles.reduce((acc, style) => {
-        acc[style.category] = true;
-        return acc;
-      }, {} as Record<string, boolean>)
-    )[0] || "", // Expand first category by default
+    Object.keys(groupedStyles)[0] || "", // Expand first category by default
   ]);
 
   const formatPrice = (price: number) => {
@@ -33,15 +60,6 @@ export const StyleSelector = ({
       currency: "VND",
     }).format(price)}`;
   };
-
-  // Group styles by category
-  const groupedStyles = styles.reduce((acc, style) => {
-    if (!acc[style.category]) {
-      acc[style.category] = [];
-    }
-    acc[style.category].push(style);
-    return acc;
-  }, {} as Record<string, Style[]>);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
@@ -58,13 +76,6 @@ export const StyleSelector = ({
 
   return (
     <div className="space-y-3">
-      <div>
-        <h3 className="text-lg font-medium">Tùy Chọn Kiểu Dáng</h3>
-        <p className="text-xs opacity-60 font-light">
-          Chọn các tùy chọn để tùy chỉnh sản phẩm theo ý muốn
-        </p>
-      </div>
-
       <div className="space-y-2">
         {Object.entries(groupedStyles).map(([category, categoryStyles]) => {
           const isExpanded = expandedCategories.includes(category);
@@ -78,7 +89,7 @@ export const StyleSelector = ({
               {/* Category Header - Clickable */}
               <button
                 onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <h4 className="text-sm font-semibold capitalize">
@@ -110,12 +121,14 @@ export const StyleSelector = ({
                     <div className="px-3 pb-3 space-y-1.5">
                       {categoryStyles.map((style) => {
                         const isSelected = selectedStyleIds.includes(style.id);
+                        const price = getStylePrice(style);
+                        const imageUrl = getStyleImage(style);
 
                         return (
                           <button
                             key={style.id}
                             onClick={() => onToggle(style.id)}
-                            className="w-full text-left"
+                            className="w-full text-left cursor-pointer"
                           >
                             <div
                               className={`p-2.5 rounded border transition-all duration-200 ${
@@ -125,27 +138,49 @@ export const StyleSelector = ({
                               }`}
                             >
                               <div className="flex items-start gap-2.5">
-                                {/* Checkbox */}
-                                <div
-                                  className={`w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
-                                    isSelected
-                                      ? "bg-gold border-gold"
-                                      : "border-white/20"
-                                  }`}
-                                >
-                                  {isSelected && (
-                                    <Check className="w-3 h-3 text-black" />
-                                  )}
-                                </div>
+                                {/* Style Image (if available) */}
+                                {imageUrl && (
+                                  <div className="relative w-12 h-12 rounded overflow-hidden shrink-0 bg-gray-800">
+                                    <Image
+                                      src={imageUrl}
+                                      alt={style.name}
+                                      fill
+                                      className="object-cover"
+                                      unoptimized
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Radio indicator (only show if no image) */}
+                                {!imageUrl && (
+                                  <div
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
+                                      isSelected
+                                        ? "bg-gold border-gold"
+                                        : "border-white/20"
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <div className="w-2 h-2 rounded-full bg-black" />
+                                    )}
+                                  </div>
+                                )}
 
                                 {/* Style Info */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-start justify-between gap-2">
-                                    <h5 className="font-medium text-xs leading-tight">
-                                      {style.name}
-                                    </h5>
+                                    <div className="flex items-center gap-2">
+                                      <h5 className="font-medium text-xs leading-tight">
+                                        {style.name}
+                                      </h5>
+                                      {imageUrl && isSelected && (
+                                        <div className="bg-gold rounded-full p-0.5">
+                                          <Check className="w-2.5 h-2.5 text-black" />
+                                        </div>
+                                      )}
+                                    </div>
                                     <span className="text-luxury font-semibold text-xs whitespace-nowrap">
-                                      {formatPrice(style.priceModifier)}
+                                      {formatPrice(price)}
                                     </span>
                                   </div>
                                   {style.description && (

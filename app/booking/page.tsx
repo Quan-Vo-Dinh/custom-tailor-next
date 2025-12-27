@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
@@ -15,49 +17,77 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { AppointmentType, TimeSlot } from "@/types";
+import { getAvailableSlots, createAppointment } from "@/services/appointments";
 
 export default function BookingPage() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(
     AppointmentType.CONSULTATION
   );
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<
+    string | null
+  >(null);
+
+  // Load available slots when date is selected
+  useEffect(() => {
+    const loadSlots = async () => {
+      if (!selectedDate) {
+        setAvailableSlots([]);
+        return;
+      }
+
+      try {
+        setLoadingSlots(true);
+        const slots = await getAvailableSlots(selectedDate, appointmentType);
+        setAvailableSlots(slots);
+        // Reset selected slot if it's not available anymore
+        if (selectedSlot && !slots.find((s) => s.id === selectedSlot.id)) {
+          setSelectedSlot(null);
+        }
+      } catch (error: any) {
+        console.error("Failed to load available slots:", error);
+        toast.error("Không thể tải khung giờ. Vui lòng thử lại.");
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    loadSlots();
+  }, [selectedDate, appointmentType]);
 
   const handleSubmit = async () => {
     if (!selectedDate || !selectedSlot) {
-      alert("Vui lòng chọn ngày và khung giờ");
+      toast.error("Vui lòng chọn ngày và khung giờ");
       return;
     }
 
     try {
       setSubmitting(true);
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock success
-      console.log("Booking created:", {
+      const appointment = await createAppointment({
         type: appointmentType,
         date: selectedDate,
         startTime: selectedSlot.startTime,
         endTime: selectedSlot.endTime,
-        notes: notes || undefined,
+        notes: notes.trim() || undefined,
       });
 
+      setCreatedAppointmentId(appointment.id);
       setSuccess(true);
+      toast.success("Đặt lịch thành công!");
+
       setTimeout(() => {
-        setSelectedDate(null);
-        setSelectedSlot(null);
-        setNotes("");
-        setSuccess(false);
-      }, 3000);
-    } catch (error) {
-      alert(
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi đặt lịch"
-      );
+        router.push("/appointments");
+      }, 2000);
+    } catch (error: any) {
+      toast.error(error.message || "Đặt lịch thất bại. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -123,6 +153,8 @@ export default function BookingPage() {
                   date={selectedDate}
                   selectedSlot={selectedSlot}
                   onSelect={setSelectedSlot}
+                  availableSlots={availableSlots}
+                  loading={loadingSlots}
                 />
               </AnimatedSection>
             )}
@@ -179,7 +211,7 @@ export default function BookingPage() {
                       onChange={(e) =>
                         setAppointmentType(e.target.value as AppointmentType)
                       }
-                      className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                      className="w-full px-4 py-3 bg-gray-800 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
                     >
                       <option value={AppointmentType.CONSULTATION}>
                         Tư vấn

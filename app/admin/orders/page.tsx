@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -20,103 +20,50 @@ import {
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
-
-// Mock data
-const mockOrders = [
-  {
-    id: "ORD-2024-001",
-    customerName: "Nguyễn Văn A",
-    customerEmail: "nguyenvana@example.com",
-    productName: "Vest Truyền Thống",
-    quantity: 1,
-    totalAmount: 4500000,
-    status: "Completed",
-    paymentStatus: "Paid",
-    createdAt: "2024-01-15T10:30:00Z",
-    estimatedDelivery: "2024-02-01",
-  },
-  {
-    id: "ORD-2024-002",
-    customerName: "Trần Thị B",
-    customerEmail: "tranthib@example.com",
-    productName: "Sơ Mi Cao Cấp",
-    quantity: 2,
-    totalAmount: 3200000,
-    status: "In_Production",
-    paymentStatus: "Paid",
-    createdAt: "2024-01-20T14:00:00Z",
-    estimatedDelivery: "2024-02-10",
-  },
-  {
-    id: "ORD-2024-003",
-    customerName: "Lê Văn C",
-    customerEmail: "levanc@example.com",
-    productName: "Vest Hiện Đại",
-    quantity: 1,
-    totalAmount: 5500000,
-    status: "Shipping",
-    paymentStatus: "Paid",
-    createdAt: "2024-01-25T09:15:00Z",
-    estimatedDelivery: "2024-02-05",
-  },
-  {
-    id: "ORD-2024-004",
-    customerName: "Phạm Thị D",
-    customerEmail: "phamthid@example.com",
-    productName: "Áo Dài Truyền Thống",
-    quantity: 1,
-    totalAmount: 6200000,
-    status: "Pending",
-    paymentStatus: "Pending",
-    createdAt: "2024-02-01T11:00:00Z",
-    estimatedDelivery: "2024-02-20",
-  },
-  {
-    id: "ORD-2024-005",
-    customerName: "Hoàng Văn E",
-    customerEmail: "hoangvane@example.com",
-    productName: "Vest Dự Tiệc",
-    quantity: 1,
-    totalAmount: 7800000,
-    status: "Confirmed",
-    paymentStatus: "Paid",
-    createdAt: "2024-02-03T15:30:00Z",
-    estimatedDelivery: "2024-02-25",
-  },
-];
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { getAllOrders, updateOrderStatusAdmin } from "@/services/orders";
+import { Order, OrderStatus } from "@/types";
+import toast from "react-hot-toast";
 
 const statusConfig = {
-  Pending: {
+  PENDING: {
     label: "Chờ xác nhận",
     color: "text-yellow-400",
     bgColor: "bg-yellow-500/10",
     borderColor: "border-yellow-500/20",
   },
-  Confirmed: {
+  CONFIRMED: {
     label: "Đã xác nhận",
     color: "text-blue-400",
     bgColor: "bg-blue-500/10",
     borderColor: "border-blue-500/20",
   },
-  In_Production: {
+  IN_PRODUCTION: {
     label: "Đang sản xuất",
     color: "text-purple-400",
     bgColor: "bg-purple-500/10",
     borderColor: "border-purple-500/20",
   },
-  Shipping: {
+  READY_FOR_PICKUP: {
+    label: "Sẵn sàng lấy",
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10",
+    borderColor: "border-cyan-500/20",
+  },
+  SHIPPING: {
     label: "Đang giao hàng",
     color: "text-orange-400",
     bgColor: "bg-orange-500/10",
     borderColor: "border-orange-500/20",
   },
-  Completed: {
+  COMPLETED: {
     label: "Hoàn thành",
     color: "text-green-400",
     bgColor: "bg-green-500/10",
     borderColor: "border-green-500/20",
   },
-  Cancelled: {
+  CANCELLED: {
     label: "Đã hủy",
     color: "text-red-400",
     bgColor: "bg-red-500/10",
@@ -125,43 +72,71 @@ const statusConfig = {
 };
 
 const paymentStatusConfig = {
-  Pending: { label: "Chờ thanh toán", color: "text-yellow-400" },
-  Paid: { label: "Đã thanh toán", color: "text-green-400" },
-  Failed: { label: "Thất bại", color: "text-red-400" },
-  Refunded: { label: "Đã hoàn tiền", color: "text-blue-400" },
+  UNPAID: { label: "Chờ thanh toán", color: "text-yellow-400" },
+  PAID: { label: "Đã thanh toán", color: "text-green-400" },
+  FAILED: { label: "Thất bại", color: "text-red-400" },
+  REFUNDED: { label: "Đã hoàn tiền", color: "text-blue-400" },
 };
 
-type OrderStatus = keyof typeof statusConfig;
+type OrderStatusKey = keyof typeof statusConfig;
 
 export default function AdminOrdersPage() {
-  const [orders] = useState(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
 
+  // Fetch orders from API
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getAllOrders({
+          page: currentPage,
+          limit: itemsPerPage,
+          status: statusFilter !== "All" ? statusFilter : undefined,
+        });
+        setOrders(response.orders);
+        setTotalPages(response.pagination.totalPages);
+        setTotalItems(response.pagination.totalItems);
+      } catch (err: any) {
+        setError(err.message || "Không thể tải danh sách đơn hàng");
+        console.error("Error fetching orders:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [currentPage, statusFilter]);
+
+  // Client-side search filter
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerEmail.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "All" ? true : order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    const orderNumber = (order as any).orderNumber || order.id;
+    const customerName = (order as any).customer?.fullName || (order as any).customerName || "";
+    const customerEmail = (order as any).customer?.email || (order as any).customerEmail || "";
+    
+    return (
+      orderNumber.toLowerCase().includes(query) ||
+      customerName.toLowerCase().includes(query) ||
+      customerEmail.toLowerCase().includes(query)
+    );
   });
 
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
   const handleSelectAll = () => {
-    if (selectedOrders.length === paginatedOrders.length) {
+    if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
-      setSelectedOrders(paginatedOrders.map((o) => o.id));
+      setSelectedOrders(filteredOrders.map((o) => o.id));
     }
   };
 
@@ -173,25 +148,56 @@ export default function AdminOrdersPage() {
     );
   };
 
-  const handleBulkStatusUpdate = (newStatus: OrderStatus) => {
-    // TODO: Integrate with backend
-    console.log("Bulk update:", selectedOrders, "to", newStatus);
+  const handleBulkStatusUpdate = async (newStatus: OrderStatus) => {
+    try {
+      const promises = selectedOrders.map((orderId) =>
+        updateOrderStatusAdmin(orderId, newStatus)
+      );
+      await Promise.all(promises);
+      toast.success(`Đã cập nhật ${selectedOrders.length} đơn hàng`);
     setSelectedOrders([]);
+      // Refresh orders
+      const response = await getAllOrders({
+        page: currentPage,
+        limit: itemsPerPage,
+        status: statusFilter !== "All" ? statusFilter : undefined,
+      });
+      setOrders(response.orders);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật trạng thái");
+    }
+  };
+
+  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      await updateOrderStatusAdmin(orderId, newStatus);
+      toast.success("Đã cập nhật trạng thái đơn hàng");
+      // Refresh orders
+      const response = await getAllOrders({
+        page: currentPage,
+        limit: itemsPerPage,
+        status: statusFilter !== "All" ? statusFilter : undefined,
+      });
+      setOrders(response.orders);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể cập nhật trạng thái");
+    }
   };
 
   const handleExport = () => {
     // TODO: Implement CSV export
-    console.log("Export orders:", filteredOrders);
+    toast("Tính năng xuất báo cáo đang được phát triển", { icon: "ℹ️" });
   };
 
+  // Calculate stats from all orders (would need separate API call for accurate stats)
   const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === "Pending").length,
+    total: totalItems,
+    pending: orders.filter((o) => o.status === OrderStatus.PENDING).length,
     processing: orders.filter(
-      (o) => o.status === "Confirmed" || o.status === "In_Production"
+      (o) => o.status === OrderStatus.CONFIRMED || o.status === OrderStatus.IN_PRODUCTION
     ).length,
-    shipping: orders.filter((o) => o.status === "Shipping").length,
-    completed: orders.filter((o) => o.status === "Completed").length,
+    shipping: orders.filter((o) => o.status === OrderStatus.SHIPPING).length,
+    completed: orders.filter((o) => o.status === OrderStatus.COMPLETED).length,
   };
 
   return (
@@ -288,10 +294,10 @@ export default function AdminOrdersPage() {
                 >
                   Tất cả
                 </button>
-                {(Object.keys(statusConfig) as OrderStatus[]).map((status) => (
+                {(Object.keys(statusConfig) as OrderStatusKey[]).map((status) => (
                   <button
                     key={status}
-                    onClick={() => setStatusFilter(status)}
+                    onClick={() => setStatusFilter(status as OrderStatus)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       statusFilter === status
                         ? `${statusConfig[status].bgColor} ${statusConfig[status].color} border ${statusConfig[status].borderColor}`
@@ -318,7 +324,7 @@ export default function AdminOrdersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleBulkStatusUpdate("Confirmed")}
+                    onClick={() => handleBulkStatusUpdate(OrderStatus.CONFIRMED)}
                   >
                     <CheckCircle className="w-4 h-4" />
                     <span>Xác nhận</span>
@@ -326,7 +332,7 @@ export default function AdminOrdersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleBulkStatusUpdate("In_Production")}
+                    onClick={() => handleBulkStatusUpdate(OrderStatus.IN_PRODUCTION)}
                   >
                     <Package className="w-4 h-4" />
                     <span>Đang sản xuất</span>
@@ -334,7 +340,7 @@ export default function AdminOrdersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleBulkStatusUpdate("Shipping")}
+                    onClick={() => handleBulkStatusUpdate(OrderStatus.SHIPPING)}
                   >
                     <Truck className="w-4 h-4" />
                     <span>Giao hàng</span>
@@ -354,7 +360,24 @@ export default function AdminOrdersPage() {
           </AnimatedSection>
         )}
 
+        {/* Loading State */}
+        {loading && (
+          <AnimatedSection delay={0.45}>
+            <div className="flex justify-center py-20">
+              <LoadingSpinner />
+            </div>
+          </AnimatedSection>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <AnimatedSection delay={0.45}>
+            <ErrorMessage message={error} />
+          </AnimatedSection>
+        )}
+
         {/* Orders Table */}
+        {!loading && !error && (
         <AnimatedSection delay={0.45}>
           <GlassCard className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -365,8 +388,8 @@ export default function AdminOrdersPage() {
                       <input
                         type="checkbox"
                         checked={
-                          selectedOrders.length === paginatedOrders.length &&
-                          paginatedOrders.length > 0
+                            selectedOrders.length === filteredOrders.length &&
+                            filteredOrders.length > 0
                         }
                         onChange={handleSelectAll}
                         className="w-4 h-4 rounded border-white/20 bg-white/10 cursor-pointer"
@@ -399,12 +422,20 @@ export default function AdminOrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedOrders.map((order, index) => {
-                    const status = statusConfig[order.status as OrderStatus];
+                    {filteredOrders.map((order, index) => {
+                      const status = statusConfig[order.status as OrderStatusKey] || statusConfig.PENDING;
                     const paymentStatus =
                       paymentStatusConfig[
                         order.paymentStatus as keyof typeof paymentStatusConfig
-                      ];
+                        ] || paymentStatusConfig.UNPAID;
+                      const orderNumber = (order as any).orderNumber || order.id;
+                      const customerName = (order as any).customer?.fullName || (order as any).customerName || "N/A";
+                      const customerEmail = (order as any).customer?.email || (order as any).customerEmail || "";
+                      const firstItem = order.items?.[0];
+                      const productName = firstItem?.product?.name || "N/A";
+                      const quantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+                      const totalAmount = order.totalAmount || 0;
+                      
                     return (
                       <motion.tr
                         key={order.id}
@@ -423,31 +454,33 @@ export default function AdminOrdersPage() {
                         </td>
                         <td className="p-4">
                           <Link
-                            href={`/orders/${order.id}`}
+                              href={`/admin/orders/${order.id}`}
                             className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
-                            {order.id}
+                              {orderNumber}
                           </Link>
                         </td>
                         <td className="p-4">
                           <div>
                             <div className="text-white font-medium">
-                              {order.customerName}
+                                {customerName}
                             </div>
+                              {customerEmail && (
                             <div className="text-sm text-gray-400">
-                              {order.customerEmail}
+                                  {customerEmail}
                             </div>
+                              )}
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="text-white">{order.productName}</div>
+                            <div className="text-white">{productName}</div>
                           <div className="text-sm text-gray-400">
-                            x{order.quantity}
+                              {quantity > 0 ? `x${quantity}` : `${order.items?.length || 0} sản phẩm`}
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="text-(--color-gold) font-medium">
-                            {order.totalAmount.toLocaleString()} đ
+                            <div className="text-[var(--color-gold)] font-medium">
+                              {totalAmount.toLocaleString()} đ
                           </div>
                         </td>
                         <td className="p-4">
@@ -471,25 +504,25 @@ export default function AdminOrdersPage() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
-                            <Link href={`/orders/${order.id}`}>
+                              <Link href={`/admin/orders/${order.id}`}>
                               <button
-                                className="p-2 hover:bg-(--color-gold)/10 rounded-lg transition-colors cursor-pointer"
+                                  className="p-2 hover:bg-[var(--color-gold)]/10 rounded-lg transition-colors cursor-pointer"
                                 title="Xem chi tiết"
                               >
-                                <Eye className="w-4 h-4 text-(--color-gold)" />
+                                  <Eye className="w-4 h-4 text-[var(--color-gold)]" />
                               </button>
                             </Link>
                             <button
                               className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors cursor-pointer"
                               title="Chỉnh sửa"
+                                onClick={() => {
+                                  // TODO: Open edit modal
+                                  toast("Tính năng chỉnh sửa đang được phát triển", {
+                                    icon: "ℹ️",
+                                  });
+                                }}
                             >
                               <Edit2 className="w-4 h-4 text-blue-400" />
-                            </button>
-                            <button
-                              className="p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                              title="Thêm"
-                            >
-                              <MoreVertical className="w-4 h-4 text-gray-400" />
                             </button>
                           </div>
                         </td>
@@ -505,8 +538,8 @@ export default function AdminOrdersPage() {
               <div className="p-4 border-t border-white/10 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
                   Hiển thị {(currentPage - 1) * itemsPerPage + 1} -{" "}
-                  {Math.min(currentPage * itemsPerPage, filteredOrders.length)}{" "}
-                  trong tổng số {filteredOrders.length} đơn hàng
+                    {Math.min(currentPage * itemsPerPage, totalItems)}{" "}
+                    trong tổng số {totalItems} đơn hàng
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -523,7 +556,7 @@ export default function AdminOrdersPage() {
                         onClick={() => setCurrentPage(page)}
                         className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                           currentPage === page
-                            ? "bg-(--color-gold) text-charcoal"
+                              ? "bg-[var(--color-gold)] text-charcoal"
                             : "bg-white/5 text-gray-400 hover:bg-white/10"
                         }`}
                       >
@@ -545,13 +578,14 @@ export default function AdminOrdersPage() {
             )}
           </GlassCard>
         </AnimatedSection>
+        )}
 
         {/* Empty State */}
-        {filteredOrders.length === 0 && (
+        {!loading && !error && filteredOrders.length === 0 && (
           <AnimatedSection delay={0.5}>
             <div className="text-center py-20">
-              <div className="w-20 h-20 bg-(--color-gold)/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="w-10 h-10 text-(--color-gold)" />
+              <div className="w-20 h-20 bg-[var(--color-gold)]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Package className="w-10 h-10 text-[var(--color-gold)]" />
               </div>
               <h3 className="text-2xl font-light text-white mb-2">
                 Không tìm thấy đơn hàng

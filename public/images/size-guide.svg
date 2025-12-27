@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  
+  <!-- Title -->
+  <text x="600" y="60" font-family="Arial, sans-serif" font-size="32" fill="#d4af37" text-anchor="middle" font-weight="bold">
+    HƯỚNG DẪN ĐO SỐ ĐO
+  </text>
+  
+  <!-- Women's section -->
+  <g transform="translate(100, 100)">
+    <text x="200" y="30" font-family="Arial, sans-serif" font-size="20" fill="#d4af37" text-anchor="middle">NỮ - ÁO DÀI</text>
+    
+    <!-- Body outline -->
+    <ellipse cx="200" cy="100" rx="25" ry="30" fill="none" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="130" x2="200" y2="280" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="150" x2="140" y2="230" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="150" x2="260" y2="230" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="280" x2="160" y2="420" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="280" x2="240" y2="420" stroke="#fff" stroke-width="2"/>
+    
+    <!-- Measurement lines -->
+    <line x1="50" y1="70" x2="50" y2="420" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="40" y="250" font-family="Arial, sans-serif" font-size="12" fill="#d4af37" text-anchor="end">1. Chiều dài áo</text>
+    
+    <ellipse cx="200" cy="100" rx="40" ry="15" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="260" y="100" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">2. Vòng cổ</text>
+    
+    <ellipse cx="200" cy="170" rx="50" ry="20" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="270" y="170" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">4. Vòng ngực</text>
+    
+    <ellipse cx="200" cy="220" rx="40" ry="15" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="260" y="220" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">5. Vòng eo</text>
+    
+    <ellipse cx="200" cy="280" rx="50" ry="20" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="270" y="280" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">6. Vòng mông</text>
+    
+    <line x1="200" y1="150" x2="130" y2="240" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="100" y="200" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">7. Dài tay</text>
+    
+    <!-- Measurements list -->
+    <text x="0" y="480" font-family="Arial, sans-serif" font-size="11" fill="#ccc">1 - Chiều dài áo (từ cổ đến chân)</text>
+    <text x="0" y="500" font-family="Arial, sans-serif" font-size="11" fill="#ccc">2 - Vòng cổ (đo hết vòng cổ)</text>
+    <text x="0" y="520" font-family="Arial, sans-serif" font-size="11" fill="#ccc">3 - Ngực trên (Upper bust)</text>
+    <text x="0" y="540" font-family="Arial, sans-serif" font-size="11" fill="#ccc">4 - Vòng ngực (ngang qua đầu ngực)</text>
+    <text x="0" y="560" font-family="Arial, sans-serif" font-size="11" fill="#ccc">5 - Vòng eo (Normal waist)</text>
+    <text x="0" y="580" font-family="Arial, sans-serif" font-size="11" fill="#ccc">6 - Vòng mông (Hips)</text>
+    <text x="0" y="600" font-family="Arial, sans-serif" font-size="11" fill="#ccc">7 - Chiều dài tay (Arm length)</text>
+  </g>
+  
+  <!-- Men's section -->
+  <g transform="translate(650, 100)">
+    <text x="200" y="30" font-family="Arial, sans-serif" font-size="20" fill="#d4af37" text-anchor="middle">NAM - ÁO DÀI</text>
+    
+    <!-- Body outline -->
+    <ellipse cx="200" cy="100" rx="25" ry="30" fill="none" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="130" x2="200" y2="280" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="150" x2="130" y2="230" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="150" x2="270" y2="230" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="280" x2="170" y2="420" stroke="#fff" stroke-width="2"/>
+    <line x1="200" y1="280" x2="230" y2="420" stroke="#fff" stroke-width="2"/>
+    
+    <!-- Measurement lines -->
+    <line x1="50" y1="70" x2="50" y2="420" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="40" y="250" font-family="Arial, sans-serif" font-size="12" fill="#d4af37" text-anchor="end">1. Chiều dài</text>
+    
+    <ellipse cx="200" cy="100" rx="40" ry="15" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="260" y="100" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">2. Vòng cổ</text>
+    
+    <line x1="130" y1="150" x2="270" y2="150" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="270" y="145" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">3. Vai</text>
+    
+    <ellipse cx="200" cy="180" rx="55" ry="20" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="275" y="180" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">9. Vòng ngực</text>
+    
+    <ellipse cx="200" cy="230" rx="45" ry="15" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="265" y="230" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">10. Vòng eo</text>
+    
+    <ellipse cx="200" cy="280" rx="50" ry="18" fill="none" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="270" y="280" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">11. Vòng mông</text>
+    
+    <line x1="200" y1="150" x2="120" y2="240" stroke="#d4af37" stroke-width="1" stroke-dasharray="5,5"/>
+    <text x="90" y="200" font-family="Arial, sans-serif" font-size="12" fill="#d4af37">8. Dài tay</text>
+    
+    <!-- Measurements list -->
+    <text x="0" y="480" font-family="Arial, sans-serif" font-size="11" fill="#ccc">1 - Chiều dài áo (từ cổ đến chân)</text>
+    <text x="0" y="500" font-family="Arial, sans-serif" font-size="11" fill="#ccc">2 - Vòng cổ (đo hết vòng cổ)</text>
+    <text x="0" y="520" font-family="Arial, sans-serif" font-size="11" fill="#ccc">3 - Vai (Shoulder width)</text>
+    <text x="0" y="540" font-family="Arial, sans-serif" font-size="11" fill="#ccc">4 - Vòng nách (Armpit)</text>
+    <text x="0" y="560" font-family="Arial, sans-serif" font-size="11" fill="#ccc">8 - Chiều dài tay (Arm length)</text>
+    <text x="0" y="580" font-family="Arial, sans-serif" font-size="11" fill="#ccc">9 - Vòng ngực (Normal Bust)</text>
+    <text x="0" y="600" font-family="Arial, sans-serif" font-size="11" fill="#ccc">10 - Vòng eo (Waist)</text>
+    <text x="0" y="620" font-family="Arial, sans-serif" font-size="11" fill="#ccc">11 - Vòng mông (Hips)</text>
+  </g>
+  
+  <!-- Footer -->
+  <text x="600" y="770" font-family="Arial, sans-serif" font-size="14" fill="#888" text-anchor="middle">
+    * Đơn vị: cm (centimeters) - Đo khi mặc quần áo mỏng
+  </text>
+</svg>

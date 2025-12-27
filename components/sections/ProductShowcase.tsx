@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -7,8 +8,15 @@ import { Button } from "@/components/ui/Button";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { getProducts } from "@/services/products";
+import type { Product } from "@/types";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
-const featuredProducts = [
+// Placeholder image as data URI
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect fill='%23f3f4f6' width='800' height='600'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EProduct%3C/text%3E%3C/svg%3E";
+
+// Fallback featured products
+const fallbackProducts = [
   {
     id: "1",
     name: "Vest Doanh Nhân",
@@ -47,7 +55,38 @@ const featuredProducts = [
   },
 ];
 
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(price);
+};
+
 export const ProductShowcase = () => {
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeaturedProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await getProducts({
+          featured: true,
+          limit: 4,
+          page: 1,
+        });
+        setFeaturedProducts(response.data);
+      } catch (error) {
+        console.error("Failed to load featured products:", error);
+        // Don't fallback to mock data - show empty state instead
+        setFeaturedProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFeaturedProducts();
+  }, []);
   return (
     <section className="relative py-32 overflow-hidden">
       {/* Background Elements */}
@@ -93,8 +132,21 @@ export const ProductShowcase = () => {
         </AnimatedSection>
 
         {/* Products Grid */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <LoadingSpinner />
+          </div>
+        ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
-          {featuredProducts.map((product, index) => (
+            {featuredProducts.map((product, index) => {
+              const productImage = product.images && product.images.length > 0 
+                ? product.images[0] 
+                : fallbackProducts[index % fallbackProducts.length]?.image || PLACEHOLDER_IMAGE;
+              const productPrice = product.basePrice 
+                ? `Từ ${formatPrice(product.basePrice)}`
+                : fallbackProducts[index % fallbackProducts.length]?.price || "Liên hệ";
+              
+              return (
             <AnimatedSection key={product.id} delay={index * 0.1}>
               <Link href={`/products/${product.id}`}>
                 <motion.div
@@ -113,10 +165,11 @@ export const ProductShowcase = () => {
                     {/* Image */}
                     <div className="absolute inset-0">
                       <Image
-                        src={product.image}
+                        src={productImage}
                         alt={product.name}
                         fill
                         className="object-cover"
+                        unoptimized
                       />
                     </div>
 
@@ -136,23 +189,25 @@ export const ProductShowcase = () => {
                   {/* Product Info */}
                   <div className="space-y-2">
                     <p className="text-xs tracking-widest uppercase text-[var(--color-gold)] font-medium">
-                      {product.category}
+                      {product.category || "Sản phẩm"}
                     </p>
                     <h3 className="text-xl font-light group-hover:text-[var(--color-gold)] transition-colors duration-300">
                       {product.name}
                     </h3>
                     <p className="text-sm text-[var(--color-charcoal-lighter)] font-light">
-                      {product.description}
+                      {product.description || ""}
                     </p>
                     <p className="text-lg font-medium text-luxury pt-2">
-                      {product.price}
+                      {productPrice}
                     </p>
                   </div>
                 </motion.div>
               </Link>
             </AnimatedSection>
-          ))}
+            );
+            })}
         </div>
+        )}
 
         {/* View All Button */}
         <AnimatedSection delay={0.5} className="text-center">

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { Button } from "@/components/ui/Button";
+import { signUp } from "@/services/auth";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -59,6 +61,8 @@ export default function RegisterPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const router = useRouter();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -67,9 +71,21 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
-    // TODO: Integrate with backend API
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    try {
+      await signUp({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        phone: formData.phone || undefined,
+      });
+      // Redirect to home after successful registration
+      router.push("/");
+      router.refresh();
+    } catch (err: any) {
+      setErrors({ submit: err.message || "Đăng ký thất bại. Vui lòng thử lại." });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleRegister = async () => {

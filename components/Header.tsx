@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ShoppingBag, User, Calendar } from "lucide-react";
+import { Menu, X, ShoppingBag, User, Calendar, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const navItems = [
   { href: "/", label: "Trang Chủ" },
@@ -18,6 +21,10 @@ const navItems = [
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const { user, loading, isAuthenticated, isAdmin, isStaff, logout } =
+    useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,6 +33,17 @@ export default function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    logout();
+    router.push("/");
+    setIsMobileMenuOpen(false);
+    setShowLogoutConfirm(false);
+  };
 
   return (
     <motion.header
@@ -74,32 +92,44 @@ export default function Header() {
 
           {/* Actions */}
           <div className="hidden lg:flex items-center space-x-6">
-            {/* TODO: Show only for ADMIN role */}
-            <Link href="/admin/dashboard">
-              <Button variant="outline" size="sm">
-                Admin
-              </Button>
-            </Link>
-            <Link href="/appointments">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:text-[var(--color-gold)] transition-colors"
-                title="Lịch hẹn"
-              >
-                <Calendar className="w-5 h-5" />
-              </motion.button>
-            </Link>
-            <Link href="/profile">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:text-[var(--color-gold)] transition-colors"
-                title="Tài khoản"
-              >
-                <User className="w-5 h-5" />
-              </motion.button>
-            </Link>
+            {/* Admin button - for ADMIN and STAFF roles */}
+            {isAuthenticated && (isAdmin || isStaff) && (
+              <Link href="/admin/dashboard">
+                <Button variant="outline" size="sm">
+                  Admin
+                </Button>
+              </Link>
+            )}
+
+            {/* Appointments - only for authenticated users */}
+            {isAuthenticated && (
+              <Link href="/appointments">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 hover:text-[var(--color-gold)] transition-colors"
+                  title="Lịch hẹn"
+                >
+                  <Calendar className="w-5 h-5" />
+                </motion.button>
+              </Link>
+            )}
+
+            {/* Profile - only for authenticated users */}
+            {isAuthenticated && (
+              <Link href="/profile">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 hover:text-[var(--color-gold)] transition-colors"
+                  title="Tài khoản"
+                >
+                  <User className="w-5 h-5" />
+                </motion.button>
+              </Link>
+            )}
+
+            {/* Shopping cart - always visible */}
             <Link href="/checkout">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -113,11 +143,36 @@ export default function Header() {
                 </span>
               </motion.button>
             </Link>
-            <Link href="/register">
-              <Button variant="luxury" size="sm">
-                Đăng Ký
-              </Button>
-            </Link>
+
+            {/* Auth buttons */}
+            {!loading && (
+              <>
+                {isAuthenticated ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogoutClick}
+                    className="flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Đăng Xuất
+                  </Button>
+                ) : (
+                  <>
+                    <Link href="/login">
+                      <Button variant="outline" size="sm">
+                        Đăng Nhập
+                      </Button>
+                    </Link>
+                    <Link href="/register">
+                      <Button variant="luxury" size="sm">
+                        Đăng Ký
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -162,45 +217,115 @@ export default function Header() {
                 </motion.div>
               ))}
               <div className="pt-4 space-y-3">
-                <Link
-                  href="/profile"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Button variant="luxury" size="default" className="w-full">
-                    Tài Khoản
-                  </Button>
-                </Link>
-                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="default" className="w-full">
-                    Đăng Nhập
-                  </Button>
-                </Link>
-                <div className="flex justify-center space-x-6 pt-2">
+                {/* Admin button - for ADMIN and STAFF roles */}
+                {isAuthenticated && (isAdmin || isStaff) && (
                   <Link
-                    href="/appointments"
+                    href="/admin/dashboard"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <button className="p-2">
-                      <Calendar className="w-6 h-6" />
-                    </button>
+                    <Button variant="outline" size="default" className="w-full">
+                      Admin Dashboard
+                    </Button>
                   </Link>
+                )}
+
+                {/* Profile - only for authenticated users */}
+                {isAuthenticated && (
                   <Link
-                    href="/checkout"
+                    href="/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <button className="p-2 relative">
-                      <ShoppingBag className="w-6 h-6" />
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--color-burgundy)] text-white text-xs rounded-full flex items-center justify-center">
-                        0
-                      </span>
-                    </button>
+                    <Button variant="luxury" size="default" className="w-full">
+                      Tài Khoản
+                    </Button>
                   </Link>
-                </div>
+                )}
+
+                {/* Auth buttons */}
+                {!loading && (
+                  <>
+                    {isAuthenticated ? (
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={handleLogoutClick}
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Đăng Xuất
+                      </Button>
+                    ) : (
+                      <>
+                        <Link
+                          href="/login"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Button
+                            variant="outline"
+                            size="default"
+                            className="w-full"
+                          >
+                            Đăng Nhập
+                          </Button>
+                        </Link>
+                        <Link
+                          href="/register"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Button
+                            variant="luxury"
+                            size="default"
+                            className="w-full"
+                          >
+                            Đăng Ký
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Appointments and Cart - only for authenticated users */}
+                {isAuthenticated && (
+                  <div className="flex justify-center space-x-6 pt-2">
+                    <Link
+                      href="/appointments"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <button className="p-2">
+                        <Calendar className="w-6 h-6" />
+                      </button>
+                    </Link>
+                    <Link
+                      href="/checkout"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <button className="p-2 relative">
+                        <ShoppingBag className="w-6 h-6" />
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--color-burgundy)] text-white text-xs rounded-full flex items-center justify-center">
+                          0
+                        </span>
+                      </button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </nav>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        variant="warning"
+      />
     </motion.header>
   );
 }

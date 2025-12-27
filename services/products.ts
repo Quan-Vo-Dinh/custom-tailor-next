@@ -1,6 +1,64 @@
 import api, { getErrorMessage } from "@/lib/api";
 import { Product, Fabric, Style, ProductCategory } from "@/types";
 
+const toNumber = (value: any, fallback = 0) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : fallback;
+  }
+  if (value === null || value === undefined) return fallback;
+
+  // Handle Prisma Decimal-like objects or bigint or strings
+  try {
+    const asString =
+      typeof value === "bigint"
+        ? value.toString()
+        : value.toString
+        ? value.toString()
+        : String(value);
+    const n = parseFloat(asString);
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const mapFabric = (fabric: any): Fabric => ({
+  id: fabric.id,
+  name: fabric.name,
+  material: fabric.material || "",
+  color: fabric.color || "",
+  price: toNumber(fabric.priceAdjustment || fabric.price, 0),
+  image: fabric.imageUrl || fabric.image || "",
+  stock: toNumber(fabric.stock, 0),
+  // Also pass through API fields for components that need them
+  imageUrl: fabric.imageUrl,
+  priceAdjustment: fabric.priceAdjustment,
+  description: fabric.description,
+});
+
+const mapStyle = (style: any): Style => ({
+  id: style.id,
+  name: style.name,
+  category: style.type || style.category || "Khác",
+  description: style.description || "",
+  priceModifier: toNumber(style.priceAdjustment || style.priceModifier, 0),
+  // Also pass through API fields for components that need them
+  type: style.type,
+  imageUrl: style.imageUrl,
+  priceAdjustment: style.priceAdjustment,
+});
+
+const mapProduct = (product: any): Product => ({
+  ...product,
+  basePrice: toNumber(product.basePrice, 0),
+  availableFabrics: Array.isArray(product.availableFabrics)
+    ? product.availableFabrics.map(mapFabric)
+    : [],
+  availableStyles: Array.isArray(product.availableStyles)
+    ? product.availableStyles.map(mapStyle)
+    : [],
+});
+
 // API Response types
 export interface PaginatedResponse<T> {
   data: T[];
@@ -42,8 +100,10 @@ export const getProducts = async (
         sortOrder: params?.sortOrder || "desc",
       },
     });
+    console.log("[getProducts] Response:", response.data);
     return response.data;
   } catch (error) {
+    console.error("[getProducts] Error:", error);
     throw new Error(getErrorMessage(error));
   }
 };
@@ -52,7 +112,7 @@ export const getProducts = async (
 export const getProductById = async (id: string): Promise<Product> => {
   try {
     const response = await api.get<Product>(`/products/${id}`);
-    return response.data;
+    return mapProduct(response.data);
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -70,7 +130,7 @@ export const searchProducts = async (
         params: { query, limit },
       }
     );
-    return response.data.data;
+    return response.data.data || response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -99,7 +159,7 @@ export const getFabrics = async (params?: {
     const response = await api.get<Fabric[]>("/products/fabrics", {
       params,
     });
-    return response.data;
+    return Array.isArray(response.data) ? response.data.map(mapFabric) : [];
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -124,7 +184,7 @@ export const getStyleOptions = async (params?: {
     const response = await api.get<Style[]>("/products/style-options", {
       params,
     });
-    return response.data;
+    return Array.isArray(response.data) ? response.data.map(mapStyle) : [];
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -148,7 +208,7 @@ export const getFeaturedProducts = async (
     const response = await api.get<PaginatedResponse<Product>>("/products", {
       params: { featured: true, limit },
     });
-    return response.data.data;
+    return response.data.data || response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -191,4 +251,67 @@ export const calculatePrice = (
     stylePrice,
     totalPrice: basePrice + fabricPrice + stylePrice,
   };
+};
+
+// Admin CRUD functions
+export interface CreateProductDto {
+  name: string;
+  description?: string;
+  basePrice: number;
+  imageUrl?: string;
+  categoryId?: string;
+  category?: ProductCategory;
+  isActive?: boolean;
+}
+
+export interface UpdateProductDto {
+  name?: string;
+  description?: string;
+  basePrice?: number;
+  imageUrl?: string;
+  categoryId?: string;
+  category?: ProductCategory;
+  isActive?: boolean;
+}
+
+// Create product (Admin)
+export const createProduct = async (
+  data: CreateProductDto
+): Promise<Product> => {
+  try {
+    const response = await api.post<Product>("/products", {
+      name: data.name,
+      description: data.description,
+      basePrice: data.basePrice,
+      imageUrl: data.imageUrl,
+      categoryId: data.categoryId,
+      category: data.category,
+      isActive: data.isActive !== false,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+// Update product (Admin)
+export const updateProduct = async (
+  id: string,
+  data: UpdateProductDto
+): Promise<Product> => {
+  try {
+    const response = await api.put<Product>(`/products/${id}`, data);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+// Delete product (Admin)
+export const deleteProduct = async (id: string): Promise<void> => {
+  try {
+    await api.delete(`/products/${id}`);
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
 };

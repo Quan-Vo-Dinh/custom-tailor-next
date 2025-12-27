@@ -143,7 +143,7 @@ export default function ContactPage() {
                       <label className="block text-sm font-medium mb-2">
                         Chủ Đề
                       </label>
-                      <select className="w-full px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors">
+                      <select className="w-full px-4 py-3 bg-gray-800 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors">
                         <option>Tư vấn may đo</option>
                         <option>Đặt lịch hẹn</option>
                         <option>Hỏi về sản phẩm</option>

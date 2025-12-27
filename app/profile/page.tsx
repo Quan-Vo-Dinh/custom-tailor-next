@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import {
   User,
   Mail,
@@ -19,32 +20,28 @@ import {
   Ruler,
   MapPinned,
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
-
-// Mock user data
-const mockUser = {
-  id: "1",
-  fullName: "Nguyễn Văn A",
-  email: "nguyenvana@example.com",
-  phone: "0901234567",
-  avatar: "/images/avatar-placeholder.jpg",
-  memberSince: "2024-01-15",
-  totalOrders: 5,
-  totalAppointments: 3,
-  savedMeasurements: 2,
-  savedAddresses: 1,
-};
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { getProfile, updateProfile, getProfileStats } from "@/services/users";
+import { uploadAvatar } from "@/services/upload";
+import { changePassword } from "@/services/auth";
+import { User as UserType } from "@/types";
 
 type TabType = "overview" | "edit" | "password";
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [user, setUser] = useState<UserType | null>(null);
+  const [stats, setStats] = useState<any>(null);
   const [formData, setFormData] = useState({
-    fullName: mockUser.fullName,
-    email: mockUser.email,
-    phone: mockUser.phone,
+    fullName: "",
+    email: "",
+    phone: "",
   });
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -52,32 +49,96 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
 
-  const handleSaveProfile = () => {
-    // TODO: Integrate with backend
-    console.log("Save profile:", formData);
-    setActiveTab("overview");
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setLoading(true);
+        const [profileData, statsData] = await Promise.all([
+          getProfile(),
+          getProfileStats(),
+        ]);
+        setUser(profileData);
+        setStats(statsData);
+        setFormData({
+          fullName: profileData.name || "",
+          email: profileData.email || "",
+          phone: profileData.phone || "",
+        });
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfile();
+  }, []);
+
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      await updateProfile({
+        fullName: formData.fullName,
+        phone: formData.phone,
+      });
+      const updatedProfile = await getProfile();
+      setUser(updatedProfile);
+      setActiveTab("overview");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePassword = () => {
-    // TODO: Integrate with backend
-    console.log("Change password:", passwordData);
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+  const handleChangePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp");
+      return;
+    }
+    try {
+      setSaving(true);
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      toast.success("Đổi mật khẩu thành công");
+      setActiveTab("overview");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Có lỗi xảy ra");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleAvatarChange = () => {
-    // TODO: Implement avatar upload
-    console.log("Upload avatar");
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      setSaving(true);
+      const url = await uploadAvatar(file);
+      await updateProfile({ avatarUrl: url });
+      const updatedProfile = await getProfile();
+      setUser(updatedProfile);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Có lỗi xảy ra khi upload avatar"
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const stats = [
+  const statsList = [
     {
       icon: Package,
       label: "Đơn hàng",
-      value: mockUser.totalOrders,
+      value: stats?.orders || 0,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
       link: "/orders",
@@ -85,7 +146,7 @@ export default function ProfilePage() {
     {
       icon: Clock,
       label: "Lịch hẹn",
-      value: mockUser.totalAppointments,
+      value: stats?.appointments || 0,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
       link: "/appointments",
@@ -93,7 +154,7 @@ export default function ProfilePage() {
     {
       icon: Ruler,
       label: "Số đo",
-      value: mockUser.savedMeasurements,
+      value: stats?.measurements || 0,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
       link: "/profile/measurements",
@@ -101,7 +162,7 @@ export default function ProfilePage() {
     {
       icon: MapPinned,
       label: "Địa chỉ",
-      value: mockUser.savedAddresses,
+      value: stats?.addresses || 0,
       color: "text-orange-500",
       bgColor: "bg-orange-500/10",
       link: "/profile/addresses",
@@ -164,26 +225,46 @@ export default function ProfilePage() {
               {/* Avatar */}
               <div className="relative mb-6">
                 <div className="w-32 h-32 mx-auto rounded-full bg-linear-to-br from-(--color-gold) to-(--color-gold-light) p-1">
-                  <div className="w-full h-full rounded-full bg-(--color-charcoal) flex items-center justify-center">
-                    <User className="w-16 h-16 text-(--color-gold)" />
+                  <div className="w-full h-full rounded-full bg-(--color-charcoal) overflow-hidden flex items-center justify-center relative">
+                    {user?.avatar ? (
+                      <Image
+                        src={user.avatar}
+                        alt={user.name || "Avatar"}
+                        fill
+                        className="object-cover"
+                        sizes="128px"
+                        unoptimized
+                      />
+                    ) : (
+                      <User className="w-16 h-16 text-(--color-gold)" />
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={handleAvatarChange}
-                  className="absolute bottom-0 right-1/2 translate-x-16 translate-y-2 w-10 h-10 bg-(--color-gold) rounded-full flex items-center justify-center hover:bg-(--color-gold-light) transition-colors group cursor-pointer"
-                >
+                <label className="absolute bottom-0 right-1/2 translate-x-16 translate-y-2 w-10 h-10 bg-(--color-gold) rounded-full flex items-center justify-center hover:bg-(--color-gold-light) transition-colors group cursor-pointer">
                   <Camera className="w-5 h-5 text-(--color-charcoal)" />
-                </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                    disabled={saving}
+                  />
+                </label>
               </div>
 
               <div className="text-center mb-6">
-                <h2 className="text-xl font-medium text-white mb-1">
-                  {mockUser.fullName}
-                </h2>
-                <p className="text-sm text-gray-400">
-                  Thành viên từ{" "}
-                  {new Date(mockUser.memberSince).toLocaleDateString("vi-VN")}
-                </p>
+                {loading ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <>
+                    <h2 className="text-xl font-medium text-white mb-1">
+                      {user?.name || "Loading..."}
+                    </h2>
+                    <p className="text-sm text-gray-400">
+                      {user?.email || ""}
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Navigation */}
@@ -233,7 +314,7 @@ export default function ProfilePage() {
                 {/* Stats */}
                 <AnimatedSection delay={0.2}>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {stats.map((stat, index) => (
+                    {statsList.map((stat, index) => (
                       <Link key={index} href={stat.link}>
                         <motion.div
                           whileHover={{ scale: 1.02 }}
@@ -269,14 +350,14 @@ export default function ProfilePage() {
                           <p className="text-sm text-gray-400 mb-1">
                             Họ và tên
                           </p>
-                          <p className="text-white">{mockUser.fullName}</p>
+                          <p className="text-white">{user?.name || "N/A"}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-4">
                         <Mail className="w-5 h-5 text-(--color-gold) mt-1" />
                         <div className="flex-1">
                           <p className="text-sm text-gray-400 mb-1">Email</p>
-                          <p className="text-white">{mockUser.email}</p>
+                          <p className="text-white">{user?.email || "N/A"}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-4">
@@ -285,7 +366,7 @@ export default function ProfilePage() {
                           <p className="text-sm text-gray-400 mb-1">
                             Số điện thoại
                           </p>
-                          <p className="text-white">{mockUser.phone}</p>
+                          <p className="text-white">{user?.phone || "N/A"}</p>
                         </div>
                       </div>
                     </div>
@@ -391,9 +472,10 @@ export default function ProfilePage() {
                         variant="luxury"
                         onClick={handleSaveProfile}
                         className="flex-1"
+                        disabled={saving}
                       >
                         <Save className="w-5 h-5" />
-                        <span>Lưu thay đổi</span>
+                        <span>{saving ? "Đang lưu..." : "Lưu thay đổi"}</span>
                       </Button>
                       <Button
                         type="button"
@@ -487,9 +569,10 @@ export default function ProfilePage() {
                         variant="luxury"
                         onClick={handleChangePassword}
                         className="flex-1"
+                        disabled={saving}
                       >
                         <Save className="w-5 h-5" />
-                        <span>Đổi mật khẩu</span>
+                        <span>{saving ? "Đang xử lý..." : "Đổi mật khẩu"}</span>
                       </Button>
                       <Button
                         type="button"

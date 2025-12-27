@@ -18,9 +18,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getMockProducts, mockCategories } from "@/lib/mockData";
+import {
+  getProducts,
+  getCategories,
+  PaginatedResponse,
+} from "@/services/products";
+import { Product, ProductCategory } from "@/types";
 
 export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState({ min: 0, max: 50000000 });
@@ -28,39 +35,104 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [gridCols, setGridCols] = useState<3 | 4>(4);
+  const [productsData, setProductsData] =
+    useState<PaginatedResponse<Product> | null>(null);
+  const [categories, setCategories] = useState<
+    Array<{ value: ProductCategory; label: string; count: number }>
+  >([]);
   const itemsPerPage = 12;
 
-  const { products, total, totalPages } = getMockProducts({
-    search: searchQuery,
-    category: selectedCategory !== "all" ? selectedCategory : undefined,
-    minPrice: priceRange.min > 0 ? priceRange.min : undefined,
-    maxPrice: priceRange.max < 50000000 ? priceRange.max : undefined,
-    sort: sortBy,
-    page: currentPage,
-    limit: itemsPerPage,
-  });
-
   useEffect(() => {
-    // Simulate API loading with async pattern
     let cancelled = false;
 
-    const loadProducts = async () => {
+    const loadData = async () => {
       if (cancelled) return;
       setLoading(true);
+      setError(null);
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        // Load categories
+        const categoriesData = await getCategories();
+        console.log("Categories loaded:", categoriesData);
+        if (!cancelled) {
+          setCategories(categoriesData);
+        }
 
-      if (!cancelled) {
-        setLoading(false);
+        // Load products
+        const productsResponse = await getProducts({
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchQuery || undefined,
+          category:
+            selectedCategory !== "all"
+              ? (selectedCategory as ProductCategory)
+              : undefined,
+          minPrice: priceRange.min > 0 ? priceRange.min : undefined,
+          maxPrice: priceRange.max < 50000000 ? priceRange.max : undefined,
+          sortBy:
+            sortBy === "newest"
+              ? "createdAt"
+              : sortBy === "price"
+              ? "price"
+              : "name",
+          sortOrder: "desc",
+        });
+        if (!cancelled) {
+          setProductsData(productsResponse);
+        }
+      } catch (err) {
+        console.error("Error loading products:", err);
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Có lỗi xảy ra khi tải sản phẩm"
+          );
+          // Don't fallback to mock data - show error instead
+          // const mockData = getMockProducts({
+          //   search: searchQuery,
+          //   category: selectedCategory !== "all" ? selectedCategory : undefined,
+          //   minPrice: priceRange.min > 0 ? priceRange.min : undefined,
+          //   maxPrice: priceRange.max < 50000000 ? priceRange.max : undefined,
+          //   sort: sortBy,
+          //   page: currentPage,
+          //   limit: itemsPerPage,
+          // });
+          // setProductsData({
+          //   data: mockData.products as any,
+          //   meta: {
+          //     total: mockData.total,
+          //     page: currentPage,
+          //     limit: itemsPerPage,
+          //     totalPages: mockData.totalPages,
+          //   },
+          // });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadProducts();
+    loadData();
 
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, selectedCategory, priceRange, sortBy, currentPage]);
+  }, [
+    searchQuery,
+    selectedCategory,
+    priceRange.min,
+    priceRange.max,
+    sortBy,
+    currentPage,
+    itemsPerPage,
+  ]);
+
+  const products = productsData?.data || [];
+  const total = productsData?.meta.total || 0;
+  const totalPages = productsData?.meta.totalPages || 0;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +145,11 @@ export default function ProductsPage() {
   };
 
   const handlePriceRangeChange = (min: number, max: number) => {
-    setPriceRange({ min, max });
+    // Use functional update to avoid object reference issues
+    setPriceRange((prev) => {
+      if (prev.min === min && prev.max === max) return prev;
+      return { min, max };
+    });
     setCurrentPage(1);
   };
 
@@ -123,7 +199,7 @@ export default function ProductsPage() {
         <button
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
-          className="p-2 rounded-lg border border-white/20 hover:border-(--color-gold) disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-2 rounded-lg border border-white/20 hover:border-[var(--color-gold)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -139,8 +215,8 @@ export default function ProductsPage() {
               onClick={() => setCurrentPage(page)}
               className={`px-4 py-2 rounded-lg border transition-colors cursor-pointer ${
                 currentPage === page
-                  ? "bg-(--color-gold) text-charcoal border-(--color-gold)"
-                  : "border-white/20 text-white hover:border-(--color-gold)"
+                  ? "bg-[var(--color-gold)] text-charcoal border-[var(--color-gold)]"
+                  : "border-white/20 text-white hover:border-[var(--color-gold)]"
               }`}
             >
               {page}
@@ -151,7 +227,7 @@ export default function ProductsPage() {
         <button
           onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage === totalPages}
-          className="p-2 rounded-lg border border-white/20 hover:border-(--color-gold) disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-2 rounded-lg border border-white/20 hover:border-[var(--color-gold)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -164,7 +240,7 @@ export default function ProductsPage() {
       {/* Background Effects */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <motion.div
-          className="absolute top-20 -right-40 w-96 h-96 rounded-full bg-(--color-gold)/10 blur-3xl"
+          className="absolute top-20 -right-40 w-96 h-96 rounded-full bg-[var(--color-gold)]/10 blur-3xl"
           animate={{
             x: [0, -50, 0],
             y: [0, 30, 0],
@@ -176,7 +252,7 @@ export default function ProductsPage() {
           }}
         />
         <motion.div
-          className="absolute bottom-40 -left-40 w-96 h-96 rounded-full bg-(--color-gold)/10 blur-3xl"
+          className="absolute bottom-40 -left-40 w-96 h-96 rounded-full bg-[var(--color-gold)]/10 blur-3xl"
           animate={{
             x: [0, 50, 0],
             y: [0, -30, 0],
@@ -196,10 +272,10 @@ export default function ProductsPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-(--color-gold)/10 border border-(--color-gold)/20 mb-6"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/20 mb-6"
           >
-            <Sparkles className="w-4 h-4 text-(--color-gold)" />
-            <span className="text-sm text-(--color-gold) font-medium">
+            <Sparkles className="w-4 h-4 text-[var(--color-gold)]" />
+            <span className="text-sm text-[var(--color-gold)] font-medium">
               {total} Sản phẩm độc quyền
             </span>
           </motion.div>
@@ -222,7 +298,7 @@ export default function ProductsPage() {
               <GlassCard className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                    <SlidersHorizontal className="w-5 h-5 text-(--color-gold)" />
+                    <SlidersHorizontal className="w-5 h-5 text-[var(--color-gold)]" />
                     Bộ Lọc
                   </h3>
                   {(selectedCategory !== "all" ||
@@ -230,7 +306,7 @@ export default function ProductsPage() {
                     priceRange.max < 50000000) && (
                     <button
                       onClick={resetFilters}
-                      className="text-sm text-gray-400 hover:text-(--color-gold) transition-colors cursor-pointer"
+                      className="text-sm text-gray-400 hover:text-[var(--color-gold)] transition-colors cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -247,29 +323,46 @@ export default function ProductsPage() {
                       onClick={() => handleCategoryChange("all")}
                       className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
                         selectedCategory === "all"
-                          ? "bg-(--color-gold)/10 text-(--color-gold) border border-(--color-gold)/20"
+                          ? "bg-[var(--color-gold)]/10 text-[var(--color-gold)] border border-[var(--color-gold)]/20"
                           : "bg-white/5 text-gray-300 hover:bg-white/10"
                       }`}
                     >
                       <span className="font-medium">Tất cả</span>
                       <span className="text-sm ml-2 opacity-60">({total})</span>
                     </button>
-                    {mockCategories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => handleCategoryChange(cat.name)}
-                        className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
-                          selectedCategory === cat.name
-                            ? "bg-(--color-gold)/10 text-(--color-gold) border border-(--color-gold)/20"
-                            : "bg-white/5 text-gray-300 hover:bg-white/10"
-                        }`}
-                      >
-                        <span className="font-medium">{cat.name}</span>
-                        <span className="text-sm ml-2 opacity-60">
-                          ({cat.count})
-                        </span>
-                      </button>
-                    ))}
+                    {categories.length > 0
+                      ? categories.map((cat) => (
+                          <button
+                            key={cat.value}
+                            onClick={() => handleCategoryChange(cat.value)}
+                            className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
+                              selectedCategory === cat.value
+                                ? "bg-[var(--color-gold)]/10 text-[var(--color-gold)] border border-[var(--color-gold)]/20"
+                                : "bg-white/5 text-gray-300 hover:bg-white/10"
+                            }`}
+                          >
+                            <span className="font-medium">{cat.label}</span>
+                            <span className="text-sm ml-2 opacity-60">
+                              ({cat.count})
+                            </span>
+                          </button>
+                        ))
+                      : mockCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => handleCategoryChange(cat.name)}
+                            className={`w-full px-4 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
+                              selectedCategory === cat.name
+                                ? "bg-[var(--color-gold)]/10 text-[var(--color-gold)] border border-[var(--color-gold)]/20"
+                                : "bg-white/5 text-gray-300 hover:bg-white/10"
+                            }`}
+                          >
+                            <span className="font-medium">{cat.name}</span>
+                            <span className="text-sm ml-2 opacity-60">
+                              ({cat.count})
+                            </span>
+                          </button>
+                        ))}
                   </div>
                 </div>
 
@@ -292,7 +385,7 @@ export default function ProductsPage() {
                             priceRange.max
                           )
                         }
-                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors text-sm"
+                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors text-sm"
                         placeholder="0"
                       />
                     </div>
@@ -309,7 +402,7 @@ export default function ProductsPage() {
                             parseInt(e.target.value) || 50000000
                           )
                         }
-                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors text-sm"
+                        className="w-full px-3 py-2 bg-white/10 text-white placeholder-gray-500 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors text-sm"
                         placeholder="50,000,000"
                       />
                     </div>
@@ -334,7 +427,7 @@ export default function ProductsPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Tìm kiếm sản phẩm..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white/10 text-white placeholder-gray-400 border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors"
                       />
                     </div>
                   </form>
@@ -344,7 +437,7 @@ export default function ProductsPage() {
                     <select
                       value={sortBy}
                       onChange={(e) => handleSortChange(e.target.value)}
-                      className="px-4 py-2.5 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold) transition-colors cursor-pointer"
+                      className="px-4 py-2.5 bg-gray-800 text-white border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)] transition-colors cursor-pointer"
                     >
                       <option value="newest">Mới nhất</option>
                       <option value="price-asc">Giá tăng dần</option>
@@ -358,7 +451,7 @@ export default function ProductsPage() {
                         onClick={() => setGridCols(4)}
                         className={`p-2 rounded transition-colors cursor-pointer ${
                           gridCols === 4
-                            ? "bg-(--color-gold)/20 text-(--color-gold)"
+                            ? "bg-[var(--color-gold)]/20 text-[var(--color-gold)]"
                             : "text-gray-400 hover:text-white"
                         }`}
                         title="4 cột"
@@ -369,7 +462,7 @@ export default function ProductsPage() {
                         onClick={() => setGridCols(3)}
                         className={`p-2 rounded transition-colors cursor-pointer ${
                           gridCols === 3
-                            ? "bg-(--color-gold)/20 text-(--color-gold)"
+                            ? "bg-[var(--color-gold)]/20 text-[var(--color-gold)]"
                             : "text-gray-400 hover:text-white"
                         }`}
                         title="3 cột"
@@ -381,7 +474,7 @@ export default function ProductsPage() {
                     {/* Mobile Filter Toggle */}
                     <button
                       onClick={() => setShowFilters(!showFilters)}
-                      className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors cursor-pointer bg-white/10 border-white/20 hover:border-(--color-gold)"
+                      className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors cursor-pointer bg-white/10 border-white/20 hover:border-[var(--color-gold)]"
                     >
                       <SlidersHorizontal className="w-5 h-5" />
                     </button>
@@ -424,7 +517,7 @@ export default function ProductsPage() {
                           }}
                           className={`px-4 py-2 rounded-lg transition-colors cursor-pointer ${
                             selectedCategory === "all"
-                              ? "bg-(--color-gold) text-charcoal"
+                              ? "bg-[var(--color-gold)] text-charcoal"
                               : "bg-white/5 text-gray-300 hover:bg-white/10"
                           }`}
                         >
@@ -439,7 +532,7 @@ export default function ProductsPage() {
                             }}
                             className={`px-4 py-2 rounded-lg transition-colors cursor-pointer ${
                               selectedCategory === cat.name
-                                ? "bg-(--color-gold) text-charcoal"
+                                ? "bg-[var(--color-gold)] text-charcoal"
                                 : "bg-white/5 text-gray-300 hover:bg-white/10"
                             }`}
                           >
@@ -464,7 +557,7 @@ export default function ProductsPage() {
                               priceRange.max
                             )
                           }
-                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold)"
+                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)]"
                           placeholder="Từ"
                         />
                         <input
@@ -476,7 +569,7 @@ export default function ProductsPage() {
                               parseInt(e.target.value) || 50000000
                             )
                           }
-                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-(--color-gold)"
+                          className="flex-1 px-3 py-2 bg-white/10 text-white border border-white/20 rounded-lg focus:outline-none focus:border-[var(--color-gold)]"
                           placeholder="Đến"
                         />
                       </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,17 +14,14 @@ import {
   Truck,
   XCircle,
   Calendar,
-  MapPin,
-  CreditCard,
   ChevronDown,
   ChevronUp,
+  CreditCard,
+  MapPin,
 } from "lucide-react";
-import {
-  getMockOrders,
-  OrderStatus,
-  PaymentStatus,
-  PaymentMethod,
-} from "@/lib/mockData";
+import { getOrders } from "@/services/orders";
+import { Order, OrderStatus, PaymentStatus, PaymentMethod } from "@/types";
+import { formatOrderCode, formatPrice, formatDate } from "@/lib/utils";
 
 const statusConfig = {
   [OrderStatus.PENDING]: {
@@ -94,47 +92,58 @@ export default function OrdersPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [sortBy, setSortBy] = useState("date-desc");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const allOrders = getMockOrders({
-    status:
-      selectedStatus !== "all" ? (selectedStatus as OrderStatus) : undefined,
-    sortBy,
-  });
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getOrders({
+          status:
+            selectedStatus !== "all"
+              ? (selectedStatus as OrderStatus)
+              : undefined,
+        });
+        setOrders(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadOrders();
+  }, [selectedStatus]);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("vi-VN", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }).format(date);
-  };
+  const allOrders = orders;
 
   const toggleOrderDetails = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
   const statusCounts = {
-    all: getMockOrders().length,
-    [OrderStatus.PENDING]: getMockOrders({ status: OrderStatus.PENDING })
-      .length,
-    [OrderStatus.CONFIRMED]: getMockOrders({ status: OrderStatus.CONFIRMED })
-      .length,
-    [OrderStatus.IN_PRODUCTION]: getMockOrders({
-      status: OrderStatus.IN_PRODUCTION,
-    }).length,
-    [OrderStatus.SHIPPING]: getMockOrders({ status: OrderStatus.SHIPPING })
-      .length,
-    [OrderStatus.COMPLETED]: getMockOrders({ status: OrderStatus.COMPLETED })
-      .length,
-    [OrderStatus.CANCELLED]: getMockOrders({ status: OrderStatus.CANCELLED })
-      .length,
+    all: allOrders.length,
+    [OrderStatus.PENDING]: allOrders.filter(
+      (o) => o.status === OrderStatus.PENDING
+    ).length,
+    [OrderStatus.CONFIRMED]: allOrders.filter(
+      (o) => o.status === OrderStatus.CONFIRMED
+    ).length,
+    [OrderStatus.IN_PRODUCTION]: allOrders.filter(
+      (o) => o.status === OrderStatus.IN_PRODUCTION
+    ).length,
+    [OrderStatus.SHIPPING]: allOrders.filter(
+      (o) => o.status === OrderStatus.SHIPPING
+    ).length,
+    [OrderStatus.COMPLETED]: allOrders.filter(
+      (o) => o.status === OrderStatus.COMPLETED
+    ).length,
+    [OrderStatus.CANCELLED]: allOrders.filter(
+      (o) => o.status === OrderStatus.CANCELLED
+    ).length,
   };
 
   return (
@@ -241,7 +250,7 @@ export default function OrdersPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-800 text-gray-100 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600 transition-colors"
+                  className="w-full px-4 py-2 bg-gray-800 text-gray-100 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600 transition-colors [&>option]:bg-gray-800 [&>option]:text-gray-100"
                 >
                   <option value="date-desc">Mới nhất</option>
                   <option value="date-asc">Cũ nhất</option>
@@ -257,7 +266,22 @@ export default function OrdersPage() {
       {/* Orders List */}
       <section className="py-8">
         <div className="container mx-auto px-6 lg:px-12">
-          {allOrders.length === 0 ? (
+          {loading ? (
+            <AnimatedSection>
+              <GlassCard className="p-12 text-center">
+                <LoadingSpinner size="lg" text="Đang tải đơn hàng..." />
+              </GlassCard>
+            </AnimatedSection>
+          ) : error ? (
+            <AnimatedSection>
+              <GlassCard className="p-12 text-center">
+                <p className="text-red-400 mb-4">{error}</p>
+                <p className="text-gray-400 text-sm">
+                  Đang sử dụng dữ liệu mẫu
+                </p>
+              </GlassCard>
+            </AnimatedSection>
+          ) : allOrders.length === 0 ? (
             <AnimatedSection>
               <GlassCard className="p-12 text-center">
                 <Package className="w-16 h-16 mx-auto mb-4 text-gray-400" />
@@ -290,7 +314,7 @@ export default function OrdersPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-3">
                               <h3 className="text-xl font-medium text-gray-100">
-                                {order.orderNumber}
+                                {formatOrderCode(order.id)}
                               </h3>
                               <span
                                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${status.bgColor} ${status.color} border ${status.borderColor}`}
@@ -346,40 +370,82 @@ export default function OrdersPage() {
                                   Sản phẩm
                                 </h4>
                                 <div className="space-y-4">
-                                  {order.items.map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className="flex gap-4 p-4 bg-gray-800/30 rounded-lg"
-                                    >
-                                      <div className="relative w-20 h-20 shrink-0">
-                                        <Image
-                                          src={item.productImage}
-                                          alt={item.productName}
-                                          fill
-                                          className="object-cover rounded"
-                                        />
-                                      </div>
-                                      <div className="flex-1">
-                                        <h5 className="font-medium text-gray-100 mb-1">
-                                          {item.productName}
-                                        </h5>
-                                        <div className="text-sm text-gray-400 space-y-0.5">
-                                          <p>Vải: {item.fabricName}</p>
-                                          <p>
-                                            Phong cách:{" "}
-                                            {item.styleNames.join(", ")}
-                                          </p>
-                                          <p>Số đo: {item.measurementName}</p>
-                                          <p>Số lượng: {item.quantity}</p>
+                                  {order.items.map((item) => {
+                                    const itemAny = item as any;
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        className="flex gap-4 p-4 bg-gray-800/30 rounded-lg"
+                                      >
+                                        {itemAny.productImage && (
+                                          <div className="relative w-20 h-20 shrink-0">
+                                            <Image
+                                              src={
+                                                itemAny.productImage ||
+                                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f3f4f6' width='200' height='200'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='14' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EProduct%3C/text%3E%3C/svg%3E"
+                                              }
+                                              alt={
+                                                itemAny.productName ||
+                                                itemAny.product?.name ||
+                                                "Product"
+                                              }
+                                              fill
+                                              className="object-cover rounded"
+                                              unoptimized
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex-1">
+                                          <h5 className="font-medium text-gray-100 mb-1">
+                                            {itemAny.productName ||
+                                              itemAny.product?.name ||
+                                              "Product"}
+                                          </h5>
+                                          <div className="text-sm text-gray-400 space-y-0.5">
+                                            {itemAny.fabricName && (
+                                              <p>Vải: {itemAny.fabricName}</p>
+                                            )}
+                                            {itemAny.fabric?.name && (
+                                              <p>Vải: {itemAny.fabric.name}</p>
+                                            )}
+                                            {itemAny.styleNames &&
+                                              itemAny.styleNames.length > 0 && (
+                                                <p>
+                                                  Phong cách:{" "}
+                                                  {itemAny.styleNames.join(
+                                                    ", "
+                                                  )}
+                                                </p>
+                                              )}
+                                            {itemAny.styleOption?.name && (
+                                              <p>
+                                                Phong cách:{" "}
+                                                {itemAny.styleOption.name}
+                                              </p>
+                                            )}
+                                            {itemAny.measurementName && (
+                                              <p>
+                                                Số đo: {itemAny.measurementName}
+                                              </p>
+                                            )}
+                                            <p>Số lượng: {item.quantity}</p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-lg font-medium text-yellow-600">
+                                            {formatPrice(
+                                              itemAny.subtotal ||
+                                                itemAny.unitPrice *
+                                                  item.quantity ||
+                                                Number(
+                                                  itemAny.priceAtTime || 0
+                                                ) * item.quantity
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
-                                      <div className="text-right">
-                                        <div className="text-lg font-medium text-yellow-600">
-                                          {formatPrice(item.subtotal)}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
 
@@ -392,23 +458,35 @@ export default function OrdersPage() {
                                   <div className="space-y-2 text-sm">
                                     <div className="flex items-center gap-2 text-gray-300">
                                       <CreditCard className="w-4 h-4" />
-                                      {paymentMethodLabels[order.paymentMethod]}
+                                      {
+                                        paymentMethodLabels[
+                                          ((order as any).paymentMethod ||
+                                            (order as any).payment?.method ||
+                                            PaymentMethod.COD) as PaymentMethod
+                                        ]
+                                      }
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span
                                         className={`px-2 py-1 rounded text-xs font-medium ${
-                                          order.paymentStatus ===
-                                          PaymentStatus.PAID
+                                          (order as any).paymentStatus ===
+                                            PaymentStatus.PAID ||
+                                          (order as any).payment?.status ===
+                                            PaymentStatus.PAID
                                             ? "bg-green-100 text-green-800"
-                                            : order.paymentStatus ===
-                                              PaymentStatus.PENDING
+                                            : (order as any).paymentStatus ===
+                                                PaymentStatus.PENDING ||
+                                              (order as any).payment?.status ===
+                                                PaymentStatus.PENDING
                                             ? "bg-yellow-100 text-yellow-800"
                                             : "bg-red-100 text-red-800"
                                         }`}
                                       >
                                         {
                                           paymentStatusLabels[
-                                            order.paymentStatus
+                                            ((order as any).paymentStatus ||
+                                              (order as any).payment?.status ||
+                                              PaymentStatus.PENDING) as PaymentStatus
                                           ]
                                         }
                                       </span>
@@ -416,27 +494,36 @@ export default function OrdersPage() {
                                   </div>
                                 </div>
 
-                                {order.shippingAddress && (
+                                {((order as any).shippingAddress ||
+                                  typeof (order as any).shippingAddress ===
+                                    "object") && (
                                   <div>
                                     <h4 className="text-lg font-medium text-gray-100 mb-3">
                                       Địa chỉ giao hàng
                                     </h4>
                                     <div className="flex items-start gap-2 text-sm text-gray-300">
                                       <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                                      <span>{order.shippingAddress}</span>
+                                      <span>
+                                        {typeof (order as any)
+                                          .shippingAddress === "string"
+                                          ? (order as any).shippingAddress
+                                          : JSON.stringify(
+                                              (order as any).shippingAddress
+                                            )}
+                                      </span>
                                     </div>
                                   </div>
                                 )}
                               </div>
 
                               {/* Notes */}
-                              {order.notes && (
+                              {(order as any).notes && (
                                 <div>
                                   <h4 className="text-lg font-medium text-gray-100 mb-3">
                                     Ghi chú
                                   </h4>
                                   <p className="text-sm text-gray-400 bg-gray-800/30 p-4 rounded-lg">
-                                    {order.notes}
+                                    {(order as any).notes}
                                   </p>
                                 </div>
                               )}

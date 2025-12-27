@@ -4,6 +4,8 @@ import {
   AppointmentType,
   AppointmentStatus,
   TimeSlot,
+  UserRole,
+  User,
 } from "@/types";
 
 // Create appointment DTO
@@ -50,6 +52,45 @@ export const createAppointment = async (
   }
 };
 
+const toUser = (
+  payload: any,
+  role: UserRole.CUSTOMER | UserRole.STAFF
+): User => ({
+  id: payload?.id,
+  email: payload?.email,
+  name: payload?.email?.split("@")[0] ?? "",
+  role,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+
+const toAppointment = (apt: any): Appointment => {
+  const start = new Date(apt.startTime);
+  const end = new Date(apt.endTime);
+
+  return {
+    id: apt.id,
+    customerId: apt.userId,
+    customer: apt.user ? toUser(apt.user, UserRole.CUSTOMER) : ({} as User),
+    type: (apt.type as AppointmentType) || AppointmentType.CONSULTATION,
+    status: apt.status as AppointmentStatus,
+    date: start,
+    startTime: start.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    endTime: end.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    notes: apt.notes ?? "",
+    assignedStaffId: apt.staffId ?? undefined,
+    assignedStaff: apt.staff ? toUser(apt.staff, UserRole.STAFF) : undefined,
+    createdAt: new Date(apt.createdAt),
+    updatedAt: new Date(apt.updatedAt),
+  };
+};
+
 // Get my appointments (customer)
 export const getMyAppointments = async (params?: {
   status?: AppointmentStatus;
@@ -57,10 +98,19 @@ export const getMyAppointments = async (params?: {
   toDate?: string;
 }): Promise<Appointment[]> => {
   try {
-    const response = await api.get<Appointment[]>("/appointments/my", {
+    // Use dedicated /appointments/my endpoint for current customer
+    const response = await api.get("/appointments/my", {
       params,
     });
-    return response.data;
+
+    // Backend wraps data as { statusCode, data, timestamp }
+    const raw = (response.data as any)?.data ?? response.data;
+
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+
+    return raw.map(toAppointment);
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -69,8 +119,9 @@ export const getMyAppointments = async (params?: {
 // Get appointment by ID
 export const getAppointmentById = async (id: string): Promise<Appointment> => {
   try {
-    const response = await api.get<Appointment>(`/appointments/${id}`);
-    return response.data;
+    const response = await api.get(`/appointments/${id}`);
+    const raw = (response.data as any)?.data ?? response.data;
+    return toAppointment(raw);
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -236,5 +287,130 @@ export const getAppointmentTypeLabel = (type: AppointmentType): string => {
       return "Nhận hàng";
     default:
       return type;
+  }
+};
+
+// Admin functions
+export interface GetAllAppointmentsParams {
+  page?: number;
+  limit?: number;
+  status?: AppointmentStatus;
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+}
+
+export interface PaginatedAppointmentsResponse {
+  appointments: Appointment[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+}
+
+// Get all appointments (Admin/Staff)
+export const getAllAppointments = async (
+  params?: GetAllAppointmentsParams
+): Promise<PaginatedAppointmentsResponse> => {
+  try {
+    const response = await api.get<any>("/appointments/admin/all", {
+      params: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        status: params?.status,
+        fromDate: params?.fromDate,
+        toDate: params?.toDate,
+        search: params?.search,
+      },
+    });
+
+    // Backend returns { appointments, pagination }
+    const data = response.data?.data ?? response.data;
+    const rawAppointments = data?.appointments ?? [];
+
+    return {
+      appointments: rawAppointments.map((apt: any) => ({
+        id: apt.id,
+        customerId: apt.userId,
+        customer: apt.user
+          ? {
+              id: apt.user.id,
+              email: apt.user.email,
+              name:
+                apt.user.profile?.fullName ||
+                apt.user.email?.split("@")[0] ||
+                "",
+              phone: apt.user.profile?.phone || "",
+              role: UserRole.CUSTOMER,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }
+          : undefined,
+        type: apt.type || AppointmentType.CONSULTATION,
+        status: apt.status as AppointmentStatus,
+        startTime: apt.startTime,
+        endTime: apt.endTime,
+        notes: apt.notes || "",
+        assignedStaffId: apt.staffId,
+        assignedStaff: apt.staff
+          ? {
+              id: apt.staff.id,
+              email: apt.staff.email,
+              name:
+                apt.staff.profile?.fullName ||
+                apt.staff.email?.split("@")[0] ||
+                "",
+              role: UserRole.STAFF,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }
+          : undefined,
+        createdAt: new Date(apt.createdAt),
+        updatedAt: new Date(apt.updatedAt),
+      })),
+      pagination: {
+        currentPage: data?.pagination?.page || 1,
+        totalPages: data?.pagination?.totalPages || 1,
+        totalItems: data?.pagination?.totalItems || 0,
+        itemsPerPage: data?.pagination?.limit || 10,
+      },
+    };
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+// Update appointment status (Admin/Staff)
+export const updateAppointmentStatus = async (
+  appointmentId: string,
+  status: AppointmentStatus,
+  notes?: string
+): Promise<Appointment> => {
+  try {
+    const response = await api.patch<Appointment>(
+      `/appointments/${appointmentId}/status`,
+      { status, notes }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+// Assign staff to appointment (Admin)
+export const assignStaffToAppointment = async (
+  appointmentId: string,
+  staffId: string
+): Promise<Appointment> => {
+  try {
+    const response = await api.patch<Appointment>(
+      `/appointments/${appointmentId}/assign-staff`,
+      { staffId }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
   }
 };

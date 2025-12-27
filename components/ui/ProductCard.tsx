@@ -6,6 +6,9 @@ import Link from "next/link";
 import { GlassCard } from "./GlassCard";
 import { ArrowRight } from "lucide-react";
 
+// Placeholder image as data URI
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect fill='%23f3f4f6' width='800' height='600'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle'%3EProduct%3C/text%3E%3C/svg%3E";
+
 interface ProductCardProps {
   product: {
     id: string;
@@ -39,10 +42,11 @@ export const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
           {/* Product Image */}
           <div className="relative aspect-3/4 overflow-hidden bg-gray-100">
             <Image
-              src={product.images[0] || "/placeholder-product.jpg"}
+              src={product.images[0] || PLACEHOLDER_IMAGE}
               alt={product.name}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-110"
+              unoptimized
             />
             {product.featured && (
               <div className="absolute top-4 right-4 px-3 py-1 bg-[var(--color-gold)] text-[var(--color-charcoal)] text-xs font-medium tracking-wider uppercase">
